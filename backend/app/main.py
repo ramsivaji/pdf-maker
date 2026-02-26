@@ -21,6 +21,7 @@ origins = [
     "http://127.0.0.1:5173",
     "https://pdf-maker.vercel.app", # Potential user URL
     "https://*.vercel.app",    # Allow any Vercel deployment
+    "https://elegant-dream-production.up.railway.app", # User's Frontend URL
 ]
 
 app.add_middleware(
