@@ -1,8 +1,8 @@
 // Initialize Lucide icons
 lucide.createIcons();
 
-// Replace this with your actual Railway backend URL
-const API_BASE_URL = "https://pdf-maker-production-8225.up.railway.app";
+// Since frontend is now served by FastAPI directly, API calls are relative
+const API_BASE_URL = "";
 
 // Tool Configurations
 const tools = {

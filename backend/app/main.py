@@ -1,5 +1,7 @@
+import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from app.api.route_convert import router as convert_router
 
@@ -14,14 +16,8 @@ app = FastAPI(
     redoc_url="/redoc",
 )
 
-# Allow requests from the React dev server and any deployed frontend URL
 origins = [
-    "http://localhost:5173",   # Vite default dev port
-    "http://localhost:3000",   # Create React App default dev port
-    "http://127.0.0.1:5173",
-    "https://pdf-maker.vercel.app", # Potential user URL
-    "https://*.vercel.app",    # Allow any Vercel deployment
-    "https://elegant-dream-production.up.railway.app", # User's Frontend URL
+    "*", # Allow everywhere since everything is on one domain now
 ]
 
 app.add_middleware(
@@ -34,10 +30,7 @@ app.add_middleware(
 
 app.include_router(convert_router)
 
+# Serve the raw HTML/CSS/JS frontend on the root URL
+frontend_path = os.path.join(os.path.dirname(__file__), "..", "..", "frontend")
+app.mount("/", StaticFiles(directory=frontend_path, html=True), name="frontend")
 
-@app.get("/", tags=["Health"])
-def health_check():
-    return {
-        "status": "ok",
-        "message": "PDF Maker API is running. Visit /docs for the interactive API documentation.",
-    }
