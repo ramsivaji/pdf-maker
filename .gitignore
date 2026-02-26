@@ -1,0 +1,22 @@
+# Python virtual environment — never commit this!
+backend/venv/
+backend/__pycache__/
+backend/**/__pycache__/
+backend/**/*.pyc
+backend/**/*.pyo
+
+# Temp storage — user uploaded files
+backend/temp_storage/*
+!backend/temp_storage/.gitkeep
+
+# Frontend build output
+frontend/dist/
+frontend/node_modules/
+
+# Environment files
+frontend/.env.local
+frontend/.env.production
+
+# OS files
+.DS_Store
+Thumbs.db
