@@ -16,6 +16,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy the full backend application code
 COPY backend/ .
 
+# Copy the frontend application code
+COPY frontend/ /frontend/
+
 # Create temp storage directory
 RUN mkdir -p temp_storage
 
