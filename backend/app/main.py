@@ -19,8 +19,8 @@ origins = [
     "http://localhost:5173",   # Vite default dev port
     "http://localhost:3000",   # Create React App default dev port
     "http://127.0.0.1:5173",
-    # Add your production domain here when deploying, e.g.:
-    # "https://your-app.vercel.app",
+    "https://pdf-maker.vercel.app", # Potential user URL
+    "https://*.vercel.app",    # Allow any Vercel deployment
 ]
 
 app.add_middleware(
