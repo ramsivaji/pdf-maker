@@ -1,13 +1,154 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>PDF Maker</title>
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.jsx"></script>
-  </body>
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PDF Maker - Free Online File Conversion</title>
+  <!-- Bootstrap CSS -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <!-- Custom CSS -->
+  <link rel="stylesheet" href="style.css">
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+
+<body class="bg-dark text-light">
+
+  <!-- Navbar -->
+  <nav class="navbar navbar-expand-lg navbar-dark bg-glass border-bottom border-secondary mb-5">
+    <div class="container">
+      <a class="navbar-brand d-flex align-items-center gap-2 fw-bold brand-gradient" href="#"
+        onclick="showSection('home')">
+        <i data-lucide="file-text"></i> PDF Maker
+      </a>
+      <div class="navbar-nav ms-auto flex-row gap-3">
+        <a class="nav-link nav-btn" href="#" onclick="showSection('pdf-to-word')">PDF → Word</a>
+        <a class="nav-link nav-btn" href="#" onclick="showSection('word-to-pdf')">Word → PDF</a>
+        <a class="nav-link nav-btn" href="#" onclick="showSection('merge-pdfs')">Merge PDFs</a>
+        <a class="nav-link nav-btn" href="#" onclick="showSection('image-to-pdf')">Image → PDF</a>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Main Container -->
+  <main class="container mb-5 pb-5">
+
+    <!-- =======================
+             HOME SECTION
+             ======================= -->
+    <section id="sec-home" class="section-active">
+      <div class="text-center mb-5">
+        <h1 class="display-4 fw-bold mb-3">Your Free Online <span class="text-gradient">PDF Maker</span> Toolbox</h1>
+        <p class="lead text-secondary">Fast, secure, and private. Files are processed on the server and deleted
+          immediately after download.</p>
+      </div>
+
+      <div class="row g-4 max-w-1000 mx-auto">
+        <div class="col-md-6 col-lg-3">
+          <div class="tool-card p-4" onclick="showSection('pdf-to-word')">
+            <div class="icon-wrap bg-blue-subtle mb-3">
+              <i data-lucide="file-type-2" class="text-blue"></i>
+            </div>
+            <h5 class="fw-bold">PDF to Word</h5>
+            <p class="text-secondary small">Convert PDF documents into editable .docx Word files.</p>
+            <span class="cta-link mt-auto">Use Tool &rarr;</span>
+          </div>
+        </div>
+        <div class="col-md-6 col-lg-3">
+          <div class="tool-card p-4" onclick="showSection('word-to-pdf')">
+            <div class="icon-wrap bg-red-subtle mb-3">
+              <i data-lucide="file-text" class="text-red"></i>
+            </div>
+            <h5 class="fw-bold">Word to PDF</h5>
+            <p class="text-secondary small">Convert .docx Word documents into professional PDFs.</p>
+            <span class="cta-link mt-auto">Use Tool &rarr;</span>
+          </div>
+        </div>
+        <div class="col-md-6 col-lg-3">
+          <div class="tool-card p-4" onclick="showSection('merge-pdfs')">
+            <div class="icon-wrap bg-purple-subtle mb-3">
+              <i data-lucide="combine" class="text-purple"></i>
+            </div>
+            <h5 class="fw-bold">Merge PDFs</h5>
+            <p class="text-secondary small">Combine multiple PDF files into one single document.</p>
+            <span class="cta-link mt-auto">Use Tool &rarr;</span>
+          </div>
+        </div>
+        <div class="col-md-6 col-lg-3">
+          <div class="tool-card p-4" onclick="showSection('image-to-pdf')">
+            <div class="icon-wrap bg-green-subtle mb-3">
+              <i data-lucide="image" class="text-green"></i>
+            </div>
+            <h5 class="fw-bold">Image to PDF</h5>
+            <p class="text-secondary small">Turn JPG, PNG, and other images into a PDF document.</p>
+            <span class="cta-link mt-auto">Use Tool &rarr;</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- =======================
+             TOOL TEMPLATE STRUCTURE (Dynamically filled via JS)
+             ======================= -->
+    <section id="sec-tool" class="section-hidden max-w-800 mx-auto">
+      <button class="btn btn-outline-secondary btn-sm mb-4" onclick="showSection('home')">&larr; Back to Home</button>
+      <div class="text-center mb-4">
+        <h2 id="tool-title" class="fw-bold">Tool Title</h2>
+        <p id="tool-desc" class="text-secondary">Tool Description here</p>
+      </div>
+
+      <div class="card bg-card border-secondary shadow-lg">
+        <div class="card-body p-4 p-md-5">
+
+          <!-- File Dropzone -->
+          <div id="dropzone" class="dropzone p-5 text-center border-dashed rounded mb-4"
+            onclick="document.getElementById('file-input').click()">
+            <i data-lucide="upload-cloud" class="mb-3 text-muted" style="width: 48px; height: 48px;"></i>
+            <h5 class="mb-1 fw-bold">Click here to select files</h5>
+            <p class="text-muted small mb-0" id="dropzone-label">Or drag and drop them here</p>
+            <!-- Form input hidden -->
+            <input type="file" id="file-input" class="d-none" onchange="handleFileSelect(this)">
+          </div>
+
+          <!-- Selected Files List -->
+          <ul id="file-list" class="list-group mb-4 d-none"></ul>
+
+          <!-- Validation Error -->
+          <div id="error-alert" class="alert alert-danger d-none" role="alert"></div>
+
+          <!-- Progress Bar -->
+          <div id="progress-container" class="d-none mb-4">
+            <p id="progress-text" class="text-center small text-secondary mb-2">Uploading...</p>
+            <div class="progress" style="height: 8px;">
+              <div id="progress-bar" class="progress-bar progress-bar-striped progress-bar-animated bg-gradient"
+                role="progressbar" style="width: 0%"></div>
+            </div>
+          </div>
+
+          <!-- Action Buttons -->
+          <div class="d-flex gap-3 justify-content-center">
+            <button id="btn-convert" class="btn btn-gradient px-4 py-2 fw-semibold disabled"
+              onclick="startConversion()">Convert Now</button>
+            <button id="btn-reset" class="btn btn-outline-secondary px-4 py-2 d-none" onclick="resetTool()">Start
+              Over</button>
+          </div>
+
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="footer mt-auto py-4 border-top border-secondary text-center text-secondary small">
+    <div class="container">
+      © 2026 PDF Maker. All rights reserved &mdash; Kaisarlla Rama Sivaji
+    </div>
+  </footer>
+
+  <!-- Bootstrap JS + Custom Script -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="script.js"></script>
+</body>
+
 </html>
