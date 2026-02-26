@@ -78,15 +78,39 @@ def word_to_pdf(word_path: Path, output_path: Path) -> None:
 
 def merge_pdfs(pdf_paths: list[Path], output_path: Path) -> None:
     """
-    Merges a list of PDF files into a single PDF using PyPDF2.
+    Merges a list of PDF files into a single PDF.
+    Standardizes all pages to A4 size (595x842) by shrinking/centering them.
     """
     try:
-        from PyPDF2 import PdfMerger
-        merger = PdfMerger()
+        import fitz  # PyMuPDF
+        
+        # A4 paper size in points: 595.0 x 842.0
+        a4_rect = fitz.PaperRect("a4")
+        merged_doc = fitz.open()
+
         for path in pdf_paths:
-            merger.append(str(path))
-        merger.write(str(output_path))
-        merger.close()
+            src_doc = fitz.open(str(path))
+            for page in src_doc:
+                # Create a new blank A4 page
+                new_page = merged_doc.new_page(width=a4_rect.width, height=a4_rect.height)
+                # Draw the original page onto the new A4 page (preserves aspect ratio)
+                new_page.show_pdf_page(new_page.rect, src_doc, page.number, keep_proportion=True)
+            src_doc.close()
+
+        merged_doc.save(str(output_path))
+        merged_doc.close()
+
+    except ImportError:
+        # Fallback to PyPDF2 if fitz is somehow unavailable
+        try:
+            from PyPDF2 import PdfMerger
+            merger = PdfMerger()
+            for path in pdf_paths:
+                merger.append(str(path))
+            merger.write(str(output_path))
+            merger.close()
+        except Exception as e:
+            raise RuntimeError(f"PDF merging failed in fallback: {e}")
     except Exception as e:
         raise RuntimeError(f"PDF merging failed: {e}")
 
@@ -94,7 +118,7 @@ def merge_pdfs(pdf_paths: list[Path], output_path: Path) -> None:
 def images_to_pdf(image_paths: list[Path], output_path: Path) -> None:
     """
     Converts one or more images (JPG, PNG, etc.) into a single PDF.
-    Uses Pillow to normalize images to RGB, then img2pdf for lossless conversion.
+    Standardizes all pages to A4 size without stretching the images.
     """
     try:
         import img2pdf
@@ -104,16 +128,21 @@ def images_to_pdf(image_paths: list[Path], output_path: Path) -> None:
         processed_images = []
         for img_path in image_paths:
             with Image.open(img_path) as img:
-                # Convert to RGB if needed (handles RGBA, palette mode files etc.)
                 if img.mode not in ("RGB", "L"):
                     img = img.convert("RGB")
-                # Save to in-memory bytes for img2pdf
                 buf = io.BytesIO()
                 img.save(buf, format="JPEG", quality=95)
                 processed_images.append(buf.getvalue())
 
+        # Define A4 layout for img2pdf
+        a4inpt = (img2pdf.mm_to_pt(210), img2pdf.mm_to_pt(297))
+        layout_fun = img2pdf.get_layout_fun(
+            pagesize=a4inpt,
+            fit=img2pdf.FitMode.into
+        )
+
         with open(output_path, "wb") as f:
-            f.write(img2pdf.convert(processed_images))
+            f.write(img2pdf.convert(processed_images, layout_fun=layout_fun))
 
     except Exception as e:
         raise RuntimeError(f"Image to PDF conversion failed: {e}")
