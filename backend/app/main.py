@@ -38,5 +38,5 @@ app.include_router(convert_router)
 def health_check():
     return {
         "status": "ok",
-        "message": "ConMake API is running. Visit /docs for the interactive API documentation.",
+        "message": "PDF Maker API is running. Visit /docs for the interactive API documentation.",
     }
