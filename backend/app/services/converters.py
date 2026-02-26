@@ -85,14 +85,14 @@ def merge_pdfs(pdf_paths: list[Path], output_path: Path) -> None:
         import fitz  # PyMuPDF
         
         # A4 paper size in points: 595.0 x 842.0
-        a4_rect = fitz.PaperRect("a4")
+        a4_width, a4_height = 595.0, 842.0
         merged_doc = fitz.open()
 
         for path in pdf_paths:
             src_doc = fitz.open(str(path))
             for page in src_doc:
                 # Create a new blank A4 page
-                new_page = merged_doc.new_page(width=a4_rect.width, height=a4_rect.height)
+                new_page = merged_doc.new_page(width=a4_width, height=a4_height)
                 # Draw the original page onto the new A4 page (preserves aspect ratio)
                 new_page.show_pdf_page(new_page.rect, src_doc, page.number, keep_proportion=True)
             src_doc.close()
