@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from app.api.route_convert import router as convert_router
+from app.api.route_arrange import router as arrange_router
 
 app = FastAPI(
     title="PDF Maker - File Conversion API",
@@ -29,6 +30,7 @@ app.add_middleware(
 )
 
 app.include_router(convert_router)
+app.include_router(arrange_router)
 
 # Serve the raw HTML/CSS/JS frontend on the root URL locally.
 # On Vercel, the environment variable 'VERCEL' is set, and Vercel natively serves the static files.

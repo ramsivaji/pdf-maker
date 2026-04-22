@@ -146,3 +146,77 @@ def images_to_pdf(image_paths: list[Path], output_path: Path) -> None:
 
     except Exception as e:
         raise RuntimeError(f"Image to PDF conversion failed: {e}")
+
+
+def compress_image(image_path: Path, output_path: Path, quality: int = 80) -> None:
+    """
+    Compresses an image using Pillow. Supports JPEG, PNG, WEBP.
+    Quality is 1-100 (only meaningful for JPEG/WEBP).
+    """
+    try:
+        from PIL import Image
+
+        quality = max(1, min(100, quality))
+        with Image.open(image_path) as img:
+            fmt = (img.format or "JPEG").upper()
+            # JPEG cannot store transparency — convert RGBA/P modes
+            if fmt == "JPEG" and img.mode in ("RGBA", "P", "LA"):
+                img = img.convert("RGB")
+            save_kwargs = {"optimize": True}
+            if fmt in ("JPEG", "WEBP"):
+                save_kwargs["quality"] = quality
+            elif fmt == "PNG":
+                # PNG uses compression level 0-9 (higher = smaller but slower)
+                save_kwargs["compress_level"] = max(0, min(9, int((100 - quality) / 11)))
+            img.save(output_path, format=fmt, **save_kwargs)
+    except Exception as e:
+        raise RuntimeError(f"Image compression failed: {e}")
+
+
+def get_pdf_page_thumbnails(pdf_path: Path) -> list:
+    """
+    Renders each PDF page at 40% scale and returns a list of base64-encoded PNG strings.
+    Used to generate drag-and-drop page previews for the PDF arranger.
+    """
+    try:
+        import fitz
+        import base64
+
+        doc = fitz.open(str(pdf_path))
+        thumbnails = []
+        mat = fitz.Matrix(0.4, 0.4)  # 40% scale — fast and small enough for previews
+        for page in doc:
+            pix = page.get_pixmap(matrix=mat)
+            png_bytes = pix.tobytes("png")
+            thumbnails.append(base64.b64encode(png_bytes).decode("utf-8"))
+        doc.close()
+        return thumbnails
+    except Exception as e:
+        raise RuntimeError(f"PDF thumbnail generation failed: {e}")
+
+
+def arrange_pdf_pages(pdf_path: Path, output_path: Path, page_order: list) -> None:
+    """
+    Creates a new PDF with pages reordered according to page_order (0-indexed list).
+    Supports duplicating or removing pages as well.
+    """
+    try:
+        import fitz
+
+        src_doc = fitz.open(str(pdf_path))
+        total = src_doc.page_count
+        # Validate indices
+        for idx in page_order:
+            if not (0 <= idx < total):
+                raise RuntimeError(f"Page index {idx} is out of range (PDF has {total} pages).")
+
+        new_doc = fitz.open()
+        for idx in page_order:
+            new_doc.insert_pdf(src_doc, from_page=idx, to_page=idx)
+        new_doc.save(str(output_path))
+        new_doc.close()
+        src_doc.close()
+    except RuntimeError:
+        raise
+    except Exception as e:
+        raise RuntimeError(f"PDF page arrangement failed: {e}")

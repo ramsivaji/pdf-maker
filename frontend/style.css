@@ -19,15 +19,13 @@ body {
     -webkit-font-smoothing: antialiased;
 }
 
-.max-w-1000 {
-    max-width: 1000px;
-}
+.max-w-1200 { max-width: 1200px; }
+.max-w-1000 { max-width: 1000px; }
+.max-w-800  { max-width: 800px; }
 
-.max-w-800 {
-    max-width: 800px;
-}
-
-/* Navbar */
+/* ===========================
+   NAVBAR
+   =========================== */
 .bg-glass {
     background: rgba(13, 15, 20, 0.85) !important;
     backdrop-filter: blur(16px);
@@ -41,10 +39,10 @@ body {
 }
 
 .nav-btn {
-    font-size: 0.9rem;
+    font-size: 0.85rem;
     font-weight: 500;
     border-radius: 6px;
-    padding: 0.4rem 0.8rem !important;
+    padding: 0.35rem 0.7rem !important;
     transition: all 0.2s;
 }
 
@@ -53,7 +51,9 @@ body {
     color: #fff !important;
 }
 
-/* Typography */
+/* ===========================
+   TYPOGRAPHY
+   =========================== */
 .text-gradient {
     background: var(--gradient);
     -webkit-background-clip: text;
@@ -61,7 +61,9 @@ body {
     background-clip: text;
 }
 
-/* Tool Cards */
+/* ===========================
+   TOOL CARDS (home grid)
+   =========================== */
 .tool-card {
     background-color: var(--bg-card);
     border: 1px solid var(--border-color);
@@ -74,9 +76,9 @@ body {
 }
 
 .tool-card:hover {
-    transform: translateY(-4px);
+    transform: translateY(-5px);
     border-color: var(--border-dashed);
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+    box-shadow: 0 12px 36px rgba(0, 0, 0, 0.55);
 }
 
 .icon-wrap {
@@ -88,45 +90,27 @@ body {
     justify-content: center;
 }
 
-.text-blue {
-    color: #4f8ef7;
-}
+/* Colour tokens */
+.text-blue   { color: #4f8ef7; }
+.bg-blue-subtle   { background: rgba(79, 142, 247, 0.15); }
 
-.bg-blue-subtle {
-    background: rgba(79, 142, 247, 0.15);
-}
+.text-red    { color: #f76a4f; }
+.bg-red-subtle    { background: rgba(247, 106, 79, 0.15); }
 
-.text-red {
-    color: #f76a4f;
-}
+.text-purple { color: #a44ff7; }
+.bg-purple-subtle { background: rgba(164, 79, 247, 0.15); }
 
-.bg-red-subtle {
-    background: rgba(247, 106, 79, 0.15);
-}
+.text-green  { color: #4fc8a4; }
+.bg-green-subtle  { background: rgba(79, 200, 164, 0.15); }
 
-.text-purple {
-    color: #a44ff7;
-}
+.text-orange { color: #f7a44f; }
+.bg-orange-subtle { background: rgba(247, 164, 79, 0.15); }
 
-.bg-purple-subtle {
-    background: rgba(164, 79, 247, 0.15);
-}
+.text-cyan   { color: #4fd8f7; }
+.bg-cyan-subtle   { background: rgba(79, 216, 247, 0.15); }
 
-.text-green {
-    color: #4fc8a4;
-}
-
-.bg-green-subtle {
-    background: rgba(79, 200, 164, 0.15);
-}
-
-.text-orange {
-    color: #f7a44f;
-}
-
-.bg-orange-subtle {
-    background: rgba(247, 164, 79, 0.15);
-}
+.text-pink   { color: #f74fa4; }
+.bg-pink-subtle   { background: rgba(247, 79, 164, 0.15); }
 
 .cta-link {
     font-size: 0.85rem;
@@ -134,34 +118,31 @@ body {
     color: var(--accent-blue);
 }
 
-/* SPA Sections */
+/* ===========================
+   SPA SECTION TRANSITIONS
+   =========================== */
 .section-active {
     display: block;
     animation: fadeIn 0.3s;
 }
 
-.section-hidden {
-    display: none;
-}
+.section-hidden { display: none; }
 
 @keyframes fadeIn {
-    from {
-        opacity: 0;
-        transform: translateY(10px);
-    }
-
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
+    from { opacity: 0; transform: translateY(10px); }
+    to   { opacity: 1; transform: translateY(0); }
 }
 
-/* Internal Tool Card */
+/* ===========================
+   GENERIC TOOL CARD
+   =========================== */
 .bg-card {
     background-color: var(--bg-card) !important;
 }
 
-/* Dropzone */
+/* ===========================
+   DROPZONE
+   =========================== */
 .border-dashed {
     border: 2px dashed var(--border-dashed) !important;
 }
@@ -175,23 +156,28 @@ body {
 .dropzone:hover,
 .dropzone.dragover {
     border-color: var(--accent-blue) !important;
-    background: rgba(79, 142, 247, 0.05);
+    background: rgba(79, 142, 247, 0.06);
 }
 
-/* Custom Elements */
+/* ===========================
+   FILE LIST
+   =========================== */
 .list-group-item-dark {
     background-color: rgba(255, 255, 255, 0.05);
     border-color: var(--border-color);
     color: #fff;
 }
 
+/* ===========================
+   BUTTONS
+   =========================== */
 .btn-gradient {
     background: var(--gradient);
     color: white;
     border: none;
 }
 
-.btn-gradient:hover:not(.disabled) {
+.btn-gradient:hover:not(:disabled) {
     color: white;
     opacity: 0.9;
     box-shadow: 0 4px 15px rgba(79, 142, 247, 0.4);
@@ -199,4 +185,101 @@ body {
 
 .bg-gradient {
     background: var(--gradient) !important;
+}
+
+/* ===========================
+   QUALITY SLIDER
+   =========================== */
+.quality-slider {
+    accent-color: #4fd8f7;
+    cursor: pointer;
+}
+
+/* ===========================
+   PDF PAGE ARRANGER
+   =========================== */
+.page-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+    gap: 14px;
+    padding: 8px 0 24px;
+}
+
+.page-thumb {
+    cursor: grab;
+    border-radius: 10px;
+    border: 2px solid var(--border-color);
+    background: var(--bg-card);
+    transition: border-color 0.2s, box-shadow 0.2s, transform 0.15s;
+    position: relative;
+    user-select: none;
+}
+
+.page-thumb:hover {
+    border-color: #4f8ef7;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5);
+    transform: translateY(-3px);
+}
+
+.page-thumb.dragging {
+    opacity: 0.45;
+    cursor: grabbing;
+    transform: scale(0.97);
+}
+
+.page-thumb.drag-over {
+    border-color: #a44ff7;
+    box-shadow: 0 0 0 3px rgba(164, 79, 247, 0.35);
+}
+
+.page-thumb-inner {
+    position: relative;
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.page-thumb-inner img {
+    width: 100%;
+    display: block;
+    border-radius: 8px 8px 0 0;
+    pointer-events: none;
+}
+
+.page-label {
+    display: block;
+    text-align: center;
+    font-size: 0.72rem;
+    font-weight: 600;
+    padding: 5px 4px;
+    color: #ccc;
+    background: rgba(0,0,0,0.3);
+    border-radius: 0 0 8px 8px;
+}
+
+.page-delete-btn {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    background: rgba(247, 79, 79, 0.85);
+    border: none;
+    border-radius: 50%;
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 0.15s;
+    color: #fff;
+    padding: 0;
+}
+
+.page-thumb:hover .page-delete-btn {
+    opacity: 1;
+}
+
+/* Spinner colour for pink theme */
+.spinner-border.text-pink {
+    color: #f74fa4 !important;
 }

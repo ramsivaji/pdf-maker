@@ -14,6 +14,7 @@ from app.services.converters import (
     word_to_pdf,
     merge_pdfs,
     images_to_pdf,
+    compress_image,
 )
 
 router = APIRouter(prefix="/api/convert", tags=["Conversion"])
@@ -147,4 +148,46 @@ async def convert_image_to_pdf(
         path=str(output_path),
         filename="converted_images.pdf",
         media_type="application/pdf",
+    )
+
+
+@router.post("/compress-image", summary="Compress an image file")
+async def compress_image_endpoint(
+    background_tasks: BackgroundTasks,
+    file: UploadFile = File(..., description="An image file to compress (JPEG, PNG, WEBP)"),
+    quality: int = Form(80, ge=1, le=100, description="Compression quality 1-100 (default 80)"),
+):
+    validate_file(file, "image")
+
+    type_to_ext = {
+        "image/jpeg": ".jpg",
+        "image/png": ".png",
+        "image/webp": ".webp",
+        "image/bmp": ".bmp",
+        "image/tiff": ".tiff",
+    }
+    ext = type_to_ext.get(file.content_type, ".jpg")
+    input_path = await save_upload_file(file, ext)
+    output_path = get_output_path(ext)
+
+    try:
+        compress_image(input_path, output_path, quality)
+    except RuntimeError as e:
+        delete_files(input_path)
+        raise HTTPException(status_code=500, detail=str(e))
+
+    background_tasks.add_task(delete_files, input_path, output_path)
+
+    original_name = os.path.splitext(file.filename or "image")[0]
+    media_map = {
+        ".jpg": "image/jpeg",
+        ".png": "image/png",
+        ".webp": "image/webp",
+        ".bmp": "image/bmp",
+        ".tiff": "image/tiff",
+    }
+    return FileResponse(
+        path=str(output_path),
+        filename=f"{original_name}_compressed{ext}",
+        media_type=media_map.get(ext, "image/jpeg"),
     )
