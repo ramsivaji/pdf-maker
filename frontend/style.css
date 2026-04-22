@@ -112,6 +112,9 @@ body {
 .text-pink   { color: #f74fa4; }
 .bg-pink-subtle   { background: rgba(247, 79, 164, 0.15); }
 
+.text-teal   { color: #2dd4bf; }
+.bg-teal-subtle   { background: rgba(45, 212, 191, 0.15); }
+
 .cta-link {
     font-size: 0.85rem;
     font-weight: 600;
@@ -282,4 +285,45 @@ body {
 /* Spinner colour for pink theme */
 .spinner-border.text-pink {
     color: #f74fa4 !important;
+}
+
+/* ===========================
+   IMAGE RESIZER SECTION
+   =========================== */
+.btn-teal-gradient {
+    background: linear-gradient(135deg, #2dd4bf, #0891b2);
+    color: #fff;
+    border: none;
+    transition: opacity 0.2s, box-shadow 0.2s;
+}
+
+.btn-teal-gradient:hover:not(:disabled) {
+    color: #fff;
+    opacity: 0.9;
+    box-shadow: 0 4px 16px rgba(45, 212, 191, 0.4);
+}
+
+.resize-tabs .nav-link {
+    color: #9ca3af;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    padding: 0.4rem 1rem;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+}
+
+.resize-tabs .nav-link.active {
+    background: rgba(45, 212, 191, 0.15);
+    color: #2dd4bf;
+    border-color: #2dd4bf;
+}
+
+.resize-pct-slider {
+    accent-color: #2dd4bf;
+    cursor: pointer;
 }

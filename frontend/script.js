@@ -74,12 +74,16 @@ function showSection(sectionId) {
     document.getElementById('sec-home').className    = 'section-hidden';
     document.getElementById('sec-tool').className    = 'section-hidden max-w-800 mx-auto';
     document.getElementById('sec-arrange').className = 'section-hidden max-w-1000 mx-auto';
+    document.getElementById('sec-resize').className  = 'section-hidden max-w-700 mx-auto';
 
     if (sectionId === 'home') {
         document.getElementById('sec-home').className = 'section-active';
         currentToolId = null;
     } else if (sectionId === 'arrange-pdf') {
         document.getElementById('sec-arrange').className = 'section-active max-w-1000 mx-auto';
+        lucide.createIcons();
+    } else if (sectionId === 'resize-image') {
+        document.getElementById('sec-resize').className = 'section-active max-w-700 mx-auto';
         lucide.createIcons();
     } else {
         document.getElementById('sec-tool').className = 'section-active max-w-800 mx-auto';
@@ -478,5 +482,185 @@ async function applyArrangement() {
     } finally {
         btn.disabled = false;
         document.getElementById('arrange-progress').classList.add('d-none');
+    }
+}
+
+// ============================================================
+//  IMAGE RESIZER
+// ============================================================
+let resizeFile     = null;
+let resizeOrigW    = 0;
+let resizeOrigH    = 0;
+let resizeMode     = 'dims';   // 'dims' | 'pct'
+
+// Drag & drop for resize dropzone
+const resizeDz = document.getElementById('resize-dropzone');
+['dragenter','dragover','dragleave','drop'].forEach(evt =>
+    resizeDz.addEventListener(evt, e => { e.preventDefault(); e.stopPropagation(); })
+);
+['dragenter','dragover'].forEach(evt =>
+    resizeDz.addEventListener(evt, () => resizeDz.classList.add('dragover'))
+);
+['dragleave','drop'].forEach(evt =>
+    resizeDz.addEventListener(evt, () => resizeDz.classList.remove('dragover'))
+);
+resizeDz.addEventListener('drop', e => {
+    const files = Array.from(e.dataTransfer.files);
+    if (files.length > 0) loadResizeFile(files[0]);
+});
+
+function onResizeFileSelect(input) {
+    if (input.files && input.files.length > 0) loadResizeFile(input.files[0]);
+}
+
+function loadResizeFile(file) {
+    resizeFile = file;
+    const mb   = (file.size / 1024 / 1024).toFixed(2);
+    document.getElementById('resize-filename').textContent  = file.name;
+    document.getElementById('resize-orig-size').textContent = `${mb} MB`;
+
+    // Use createImageBitmap to get original dimensions without loading into DOM
+    const url = URL.createObjectURL(file);
+    const img  = new Image();
+    img.onload = () => {
+        resizeOrigW = img.naturalWidth;
+        resizeOrigH = img.naturalHeight;
+        URL.revokeObjectURL(url);
+
+        document.getElementById('resize-orig-dims').textContent = `${resizeOrigW} × ${resizeOrigH} px`;
+        document.getElementById('resize-width').value  = resizeOrigW;
+        document.getElementById('resize-height').value = resizeOrigH;
+        document.getElementById('resize-pct-preview').textContent =
+            `${resizeOrigW} × ${resizeOrigH} px`;
+
+        document.getElementById('resize-info').classList.remove('d-none');
+        document.getElementById('resize-controls').classList.remove('d-none');
+        document.getElementById('resize-dropzone').style.display = 'none';
+        lucide.createIcons();
+    };
+    img.src = url;
+}
+
+function switchResizeMode(mode) {
+    resizeMode = mode;
+    document.getElementById('tab-dims').classList.toggle('active', mode === 'dims');
+    document.getElementById('tab-pct').classList.toggle('active', mode === 'pct');
+    document.getElementById('mode-dims').classList.toggle('d-none', mode !== 'dims');
+    document.getElementById('mode-pct').classList.toggle('d-none', mode !== 'pct');
+    document.getElementById('resize-error').classList.add('d-none');
+}
+
+function onDimsChange(changed) {
+    if (!document.getElementById('resize-lock-ar').checked) return;
+    if (!resizeOrigW || !resizeOrigH) return;
+    const aspect = resizeOrigW / resizeOrigH;
+    if (changed === 'w') {
+        const w = parseInt(document.getElementById('resize-width').value, 10);
+        if (w > 0) document.getElementById('resize-height').value = Math.round(w / aspect);
+    } else {
+        const h = parseInt(document.getElementById('resize-height').value, 10);
+        if (h > 0) document.getElementById('resize-width').value = Math.round(h * aspect);
+    }
+}
+
+function onPctChange(val) {
+    document.getElementById('resize-pct-value').textContent = `${val}%`;
+    if (resizeOrigW && resizeOrigH) {
+        const scale = val / 100;
+        const nw = Math.max(1, Math.round(resizeOrigW * scale));
+        const nh = Math.max(1, Math.round(resizeOrigH * scale));
+        document.getElementById('resize-pct-preview').textContent = `${nw} × ${nh} px`;
+    }
+}
+
+function resetResize() {
+    resizeFile  = null;
+    resizeOrigW = 0;
+    resizeOrigH = 0;
+    document.getElementById('resize-file-input').value = '';
+    document.getElementById('resize-info').classList.add('d-none');
+    document.getElementById('resize-controls').classList.add('d-none');
+    document.getElementById('resize-error').classList.add('d-none');
+    document.getElementById('resize-progress').classList.add('d-none');
+    document.getElementById('resize-dropzone').style.display = '';
+    document.getElementById('resize-width').value  = '';
+    document.getElementById('resize-height').value = '';
+    document.getElementById('resize-pct').value    = 100;
+    document.getElementById('resize-pct-value').textContent   = '100%';
+    document.getElementById('resize-pct-preview').textContent = '—';
+    const btn = document.getElementById('resize-btn');
+    btn.disabled = false;
+    btn.innerHTML = `<i data-lucide="download" style="width:15px;height:15px;"></i> Resize &amp; Download`;
+    lucide.createIcons();
+}
+
+async function doResize() {
+    if (!resizeFile) return;
+
+    const errorEl = document.getElementById('resize-error');
+    errorEl.classList.add('d-none');
+
+    const formData = new FormData();
+    formData.append('file', resizeFile);
+
+    if (resizeMode === 'pct') {
+        const pct = parseInt(document.getElementById('resize-pct').value, 10);
+        formData.append('percent', pct);
+    } else {
+        const w = document.getElementById('resize-width').value;
+        const h = document.getElementById('resize-height').value;
+        if (!w && !h) {
+            errorEl.textContent = 'Please enter at least a width or height.';
+            errorEl.classList.remove('d-none');
+            return;
+        }
+        if (w) formData.append('width',  parseInt(w, 10));
+        if (h) formData.append('height', parseInt(h, 10));
+    }
+
+    const btn = document.getElementById('resize-btn');
+    btn.disabled = true;
+    btn.innerHTML = `<span class="spinner-border spinner-border-sm me-1"></span> Resizing…`;
+    document.getElementById('resize-progress').classList.remove('d-none');
+
+    try {
+        const res = await fetch(`${API_BASE_URL}/api/convert/resize-image`, {
+            method: 'POST',
+            body: formData,
+        });
+
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(err.detail || `Server error ${res.status}`);
+        }
+
+        const disposition = res.headers.get('Content-Disposition');
+        let filename = 'resized_image.jpg';
+        if (disposition) {
+            const match = disposition.match(/filename\*?=(?:UTF-8'')?["']?([^;"'\n]+)/i);
+            if (match) filename = decodeURIComponent(match[1].replace(/['"]/g, ''));
+        }
+
+        const blob = await res.blob();
+        const url  = window.URL.createObjectURL(blob);
+        const a    = document.createElement('a');
+        a.href     = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        window.URL.revokeObjectURL(url);
+
+        btn.innerHTML = `<i data-lucide="check" style="width:15px;height:15px;"></i> Downloaded!`;
+        lucide.createIcons();
+
+    } catch (err) {
+        errorEl.textContent = `Error: ${err.message}`;
+        errorEl.classList.remove('d-none');
+        btn.innerHTML = `<i data-lucide="download" style="width:15px;height:15px;"></i> Resize &amp; Download`;
+        lucide.createIcons();
+    } finally {
+        btn.disabled = false;
+        document.getElementById('resize-progress').classList.add('d-none');
     }
 }

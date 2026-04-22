@@ -33,6 +33,7 @@
           <a class="nav-link nav-btn" href="#" onclick="showSection('merge-pdfs')">Merge PDFs</a>
           <a class="nav-link nav-btn" href="#" onclick="showSection('image-to-pdf')">Image → PDF</a>
           <a class="nav-link nav-btn" href="#" onclick="showSection('compress-image')">Compress Image</a>
+          <a class="nav-link nav-btn" href="#" onclick="showSection('resize-image')">Resize Image</a>
           <a class="nav-link nav-btn" href="#" onclick="showSection('arrange-pdf')">Arrange PDF</a>
         </div>
       </div>
@@ -109,6 +110,18 @@
             </div>
             <h5 class="fw-bold">Compress Image</h5>
             <p class="text-secondary small">Reduce image file size while preserving quality. JPEG, PNG, WEBP.</p>
+            <span class="cta-link mt-auto">Use Tool &rarr;</span>
+          </div>
+        </div>
+
+        <!-- Resize Image -->
+        <div class="col-sm-6 col-lg-4">
+          <div class="tool-card p-4" onclick="showSection('resize-image')">
+            <div class="icon-wrap bg-teal-subtle mb-3">
+              <i data-lucide="scaling" class="text-teal"></i>
+            </div>
+            <h5 class="fw-bold">Resize Image</h5>
+            <p class="text-secondary small">Resize images by exact pixels or percentage. Preserves aspect ratio.</p>
             <span class="cta-link mt-auto">Use Tool &rarr;</span>
           </div>
         </div>
@@ -244,6 +257,117 @@
 
         <!-- Thumbnail Grid -->
         <div id="page-grid" class="page-grid"></div>
+      </div>
+    </section>
+
+    <!-- =======================
+             IMAGE RESIZE SECTION
+             ======================= -->
+    <section id="sec-resize" class="section-hidden max-w-700 mx-auto">
+      <button class="btn btn-outline-secondary btn-sm mb-4" onclick="showSection('home')">&larr; Back to Home</button>
+      <div class="text-center mb-4">
+        <h2 class="fw-bold">Resize Image</h2>
+        <p class="text-secondary">Upload an image and resize it by exact pixel dimensions or a percentage scale.</p>
+      </div>
+
+      <div class="card bg-card border-secondary shadow-lg">
+        <div class="card-body p-4 p-md-5">
+
+          <!-- Dropzone -->
+          <div id="resize-dropzone" class="dropzone p-4 text-center border-dashed rounded mb-4"
+            onclick="document.getElementById('resize-file-input').click()">
+            <i data-lucide="image-plus" class="mb-2 text-muted" style="width:40px;height:40px;"></i>
+            <h6 class="fw-bold mb-1">Click to select an image</h6>
+            <p class="text-muted small mb-0">JPG, PNG, WEBP, BMP supported</p>
+            <input type="file" id="resize-file-input" class="d-none"
+              accept=".jpg,.jpeg,.png,.webp,.bmp"
+              onchange="onResizeFileSelect(this)">
+          </div>
+
+          <!-- Original info -->
+          <div id="resize-info" class="d-none mb-4">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+              <span class="text-secondary small">📄 <span id="resize-filename"></span></span>
+              <span class="badge bg-secondary" id="resize-orig-size"></span>
+            </div>
+            <p class="text-secondary small mb-2">
+              Original size: <span class="text-light fw-semibold" id="resize-orig-dims">—</span>
+            </p>
+          </div>
+
+          <!-- Mode Tabs -->
+          <div id="resize-controls" class="d-none">
+            <ul class="nav nav-pills resize-tabs mb-4" id="resize-mode-tabs">
+              <li class="nav-item">
+                <button class="nav-link active" id="tab-dims" onclick="switchResizeMode('dims')">
+                  <i data-lucide="move-horizontal" style="width:14px;height:14px;"></i> By Dimensions
+                </button>
+              </li>
+              <li class="nav-item">
+                <button class="nav-link" id="tab-pct" onclick="switchResizeMode('pct')">
+                  <i data-lucide="percent" style="width:14px;height:14px;"></i> By Percentage
+                </button>
+              </li>
+            </ul>
+
+            <!-- Dimensions mode -->
+            <div id="mode-dims">
+              <div class="row g-3 mb-3">
+                <div class="col-6">
+                  <label class="form-label text-secondary small">Width (px)</label>
+                  <input type="number" id="resize-width" class="form-control bg-dark text-light border-secondary"
+                    placeholder="e.g. 1920" min="1" max="20000" oninput="onDimsChange('w')">
+                </div>
+                <div class="col-6">
+                  <label class="form-label text-secondary small">Height (px)</label>
+                  <input type="number" id="resize-height" class="form-control bg-dark text-light border-secondary"
+                    placeholder="e.g. 1080" min="1" max="20000" oninput="onDimsChange('h')">
+                </div>
+              </div>
+              <div class="form-check mb-3">
+                <input class="form-check-input" type="checkbox" id="resize-lock-ar" checked>
+                <label class="form-check-label text-secondary small" for="resize-lock-ar">
+                  Lock aspect ratio
+                </label>
+              </div>
+            </div>
+
+            <!-- Percentage mode -->
+            <div id="mode-pct" class="d-none">
+              <label class="form-label d-flex justify-content-between">
+                <span class="text-secondary small">Scale Percentage</span>
+                <span class="fw-bold text-teal" id="resize-pct-value">100%</span>
+              </label>
+              <input type="range" class="form-range resize-pct-slider" id="resize-pct"
+                min="5" max="300" value="100" step="5"
+                oninput="onPctChange(this.value)">
+              <div class="d-flex justify-content-between text-secondary" style="font-size:.75rem">
+                <span>5% (tiny)</span><span>100% (original)</span><span>300% (3×)</span>
+              </div>
+              <p class="text-secondary small mt-2">New size: <span class="text-light fw-semibold" id="resize-pct-preview">—</span></p>
+            </div>
+
+            <!-- Error -->
+            <div id="resize-error" class="alert alert-danger d-none mt-3"></div>
+
+            <!-- Progress -->
+            <div id="resize-progress" class="d-none mt-3">
+              <p class="text-center small text-secondary mb-2">Resizing image…</p>
+              <div class="progress" style="height:8px;">
+                <div class="progress-bar progress-bar-striped progress-bar-animated bg-gradient" style="width:60%"></div>
+              </div>
+            </div>
+
+            <!-- Action -->
+            <div class="d-flex gap-3 justify-content-center mt-4">
+              <button id="resize-btn" class="btn btn-teal-gradient px-4 py-2 fw-semibold" onclick="doResize()">
+                <i data-lucide="download" style="width:15px;height:15px;"></i> Resize &amp; Download
+              </button>
+              <button class="btn btn-outline-secondary px-4 py-2" onclick="resetResize()">Start Over</button>
+            </div>
+          </div>
+
+        </div>
       </div>
     </section>
 

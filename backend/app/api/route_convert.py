@@ -1,7 +1,7 @@
 import os
-from fastapi import APIRouter, UploadFile, File, BackgroundTasks, HTTPException
+from fastapi import APIRouter, UploadFile, File, Form, BackgroundTasks, HTTPException
 from fastapi.responses import FileResponse
-from typing import List
+from typing import List, Optional
 
 from app.utils.file_manager import (
     save_upload_file,
@@ -15,6 +15,7 @@ from app.services.converters import (
     merge_pdfs,
     images_to_pdf,
     compress_image,
+    resize_image,
 )
 
 router = APIRouter(prefix="/api/convert", tags=["Conversion"])
@@ -189,5 +190,52 @@ async def compress_image_endpoint(
     return FileResponse(
         path=str(output_path),
         filename=f"{original_name}_compressed{ext}",
+        media_type=media_map.get(ext, "image/jpeg"),
+    )
+
+
+@router.post("/resize-image", summary="Resize an image by dimensions or percentage")
+async def resize_image_endpoint(
+    background_tasks: BackgroundTasks,
+    file: UploadFile = File(..., description="An image file to resize (JPEG, PNG, WEBP, BMP)"),
+    width: Optional[int]  = Form(None, ge=1, le=20000, description="Target width in pixels"),
+    height: Optional[int] = Form(None, ge=1, le=20000, description="Target height in pixels"),
+    percent: Optional[int] = Form(None, ge=1, le=1000, description="Scale percentage (e.g. 50 = half size)"),
+):
+    if width is None and height is None and percent is None:
+        raise HTTPException(status_code=400, detail="Provide at least one of: width, height, or percent.")
+
+    validate_file(file, "image")
+
+    type_to_ext = {
+        "image/jpeg": ".jpg",
+        "image/png": ".png",
+        "image/webp": ".webp",
+        "image/bmp": ".bmp",
+        "image/tiff": ".tiff",
+    }
+    ext = type_to_ext.get(file.content_type, ".jpg")
+    input_path  = await save_upload_file(file, ext)
+    output_path = get_output_path(ext)
+
+    try:
+        new_w, new_h = resize_image(input_path, output_path, width=width, height=height, percent=percent)
+    except RuntimeError as e:
+        delete_files(input_path)
+        raise HTTPException(status_code=500, detail=str(e))
+
+    background_tasks.add_task(delete_files, input_path, output_path)
+
+    original_name = os.path.splitext(file.filename or "image")[0]
+    media_map = {
+        ".jpg": "image/jpeg",
+        ".png": "image/png",
+        ".webp": "image/webp",
+        ".bmp": "image/bmp",
+        ".tiff": "image/tiff",
+    }
+    return FileResponse(
+        path=str(output_path),
+        filename=f"{original_name}_{new_w}x{new_h}{ext}",
         media_type=media_map.get(ext, "image/jpeg"),
     )

@@ -150,8 +150,11 @@ def images_to_pdf(image_paths: list[Path], output_path: Path) -> None:
 
 def compress_image(image_path: Path, output_path: Path, quality: int = 80) -> None:
     """
-    Compresses an image using Pillow. Supports JPEG, PNG, WEBP.
-    Quality is 1-100 (only meaningful for JPEG/WEBP).
+    Compresses an image using Pillow. Each format only receives kwargs it supports.
+    - JPEG: quality + optimize
+    - WEBP: quality + method
+    - PNG:  compress_level + optimize
+    - BMP/TIFF: no extra kwargs (these formats have minimal compression support)
     """
     try:
         from PIL import Image
@@ -159,18 +162,88 @@ def compress_image(image_path: Path, output_path: Path, quality: int = 80) -> No
         quality = max(1, min(100, quality))
         with Image.open(image_path) as img:
             fmt = (img.format or "JPEG").upper()
-            # JPEG cannot store transparency — convert RGBA/P modes
-            if fmt == "JPEG" and img.mode in ("RGBA", "P", "LA"):
+
+            # JPEG cannot store transparency — convert incompatible modes
+            if fmt == "JPEG" and img.mode in ("RGBA", "P", "LA", "CMYK"):
                 img = img.convert("RGB")
-            save_kwargs = {"optimize": True}
-            if fmt in ("JPEG", "WEBP"):
-                save_kwargs["quality"] = quality
+            # Ensure PNG with palette is converted for lossless output
+            elif fmt == "PNG" and img.mode == "P":
+                img = img.convert("RGBA")
+
+            if fmt == "JPEG":
+                save_kwargs = {"quality": quality, "optimize": True}
+            elif fmt == "WEBP":
+                save_kwargs = {"quality": quality, "method": 4}
             elif fmt == "PNG":
-                # PNG uses compression level 0-9 (higher = smaller but slower)
-                save_kwargs["compress_level"] = max(0, min(9, int((100 - quality) / 11)))
+                compress_level = max(0, min(9, int((100 - quality) / 11)))
+                save_kwargs = {"optimize": True, "compress_level": compress_level}
+            else:
+                # BMP, TIFF and others — save as-is, no compression kwargs
+                save_kwargs = {}
+
             img.save(output_path, format=fmt, **save_kwargs)
     except Exception as e:
         raise RuntimeError(f"Image compression failed: {e}")
+
+
+def resize_image(
+    image_path: Path,
+    output_path: Path,
+    width: int | None = None,
+    height: int | None = None,
+    percent: int | None = None,
+) -> tuple[int, int]:
+    """
+    Resizes an image.
+    - If percent is given: scale both dimensions by that percentage.
+    - If only width is given: scale height to maintain aspect ratio.
+    - If only height is given: scale width to maintain aspect ratio.
+    - If both width and height are given: resize to exact dimensions (may stretch).
+    Returns the final (width, height).
+    """
+    try:
+        from PIL import Image
+
+        with Image.open(image_path) as img:
+            fmt = (img.format or "JPEG").upper()
+            orig_w, orig_h = img.size
+
+            if percent is not None:
+                scale = max(1, min(1000, percent)) / 100.0
+                new_w = max(1, int(orig_w * scale))
+                new_h = max(1, int(orig_h * scale))
+            elif width and height:
+                new_w, new_h = int(width), int(height)
+            elif width:
+                new_w = int(width)
+                new_h = max(1, int(orig_h * new_w / orig_w))
+            elif height:
+                new_h = int(height)
+                new_w = max(1, int(orig_w * new_h / orig_h))
+            else:
+                raise RuntimeError("Provide at least one of: width, height, or percent.")
+
+            resized = img.resize((new_w, new_h), Image.LANCZOS)
+
+            # Handle mode conversions before save
+            if fmt == "JPEG" and resized.mode in ("RGBA", "P", "LA"):
+                resized = resized.convert("RGB")
+
+            if fmt == "JPEG":
+                resized.save(output_path, format=fmt, quality=92, optimize=True)
+            elif fmt == "WEBP":
+                resized.save(output_path, format=fmt, quality=92, method=4)
+            elif fmt == "PNG":
+                resized.save(output_path, format=fmt, optimize=True)
+            else:
+                resized.save(output_path, format=fmt)
+
+            return new_w, new_h
+    except RuntimeError:
+        raise
+    except Exception as e:
+        raise RuntimeError(f"Image resize failed: {e}")
+
 
 
 def get_pdf_page_thumbnails(pdf_path: Path) -> list:
