@@ -30,7 +30,9 @@ app.add_middleware(
 
 app.include_router(convert_router)
 
-# Serve the raw HTML/CSS/JS frontend on the root URL
-frontend_path = os.path.join(os.path.dirname(__file__), "..", "..", "frontend")
-app.mount("/", StaticFiles(directory=frontend_path, html=True), name="frontend")
-
+# Serve the raw HTML/CSS/JS frontend on the root URL locally.
+# On Vercel, the environment variable 'VERCEL' is set, and Vercel natively serves the static files.
+if not os.getenv("VERCEL"):
+    frontend_path = os.path.join(os.path.dirname(__file__), "..", "..", "frontend")
+    if os.path.exists(frontend_path):
+        app.mount("/", StaticFiles(directory=frontend_path, html=True), name="frontend")

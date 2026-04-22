@@ -15,15 +15,7 @@ const tools = {
         btnText: 'Convert to Word',
         outName: 'converted_document.docx'
     },
-    'word-to-pdf': {
-        title: 'Word to PDF',
-        desc: 'Convert your Microsoft Word (.docx) files to a professional PDF document. Uses LibreOffice for perfect formatting.',
-        endpoint: '/api/convert/word-to-pdf',
-        accept: '.doc,.docx',
-        multiple: false,
-        btnText: 'Convert to PDF',
-        outName: 'converted_document.pdf'
-    },
+
     'merge-pdfs': {
         title: 'Merge PDFs',
         desc: 'Combine multiple PDF files into one single document. Upload 2 to 20 PDF files.',
