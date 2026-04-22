@@ -12,6 +12,7 @@ backend/temp_storage/*
 # Frontend build output
 frontend/dist/
 frontend/node_modules/
+frontend/.vite/
 
 # Environment files
 frontend/.env.local
