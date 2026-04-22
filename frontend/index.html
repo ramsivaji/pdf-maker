@@ -24,7 +24,7 @@
       </a>
       <div class="navbar-nav ms-auto flex-row gap-3">
         <a class="nav-link nav-btn" href="#" onclick="showSection('pdf-to-word')">PDF → Word</a>
-
+        <a class="nav-link nav-btn" href="#" onclick="showSection('word-to-pdf')">Word → PDF</a>
         <a class="nav-link nav-btn" href="#" onclick="showSection('merge-pdfs')">Merge PDFs</a>
         <a class="nav-link nav-btn" href="#" onclick="showSection('image-to-pdf')">Image → PDF</a>
       </div>
@@ -56,6 +56,16 @@
           </div>
         </div>
 
+        <div class="col-md-6 col-lg-4">
+          <div class="tool-card p-4" onclick="showSection('word-to-pdf')">
+            <div class="icon-wrap bg-orange-subtle mb-3">
+              <i data-lucide="file-output" class="text-orange"></i>
+            </div>
+            <h5 class="fw-bold">Word to PDF</h5>
+            <p class="text-secondary small">Convert .docx Word documents into high-quality PDF files.</p>
+            <span class="cta-link mt-auto">Use Tool &rarr;</span>
+          </div>
+        </div>
         <div class="col-md-6 col-lg-4">
           <div class="tool-card p-4" onclick="showSection('merge-pdfs')">
             <div class="icon-wrap bg-purple-subtle mb-3">

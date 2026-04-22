@@ -16,6 +16,16 @@ const tools = {
         outName: 'converted_document.docx'
     },
 
+    'word-to-pdf': {
+        title: 'Word to PDF',
+        desc: 'Convert a Microsoft Word (.docx) document into a high-quality PDF file.',
+        endpoint: '/api/convert/word-to-pdf',
+        accept: '.docx,.doc',
+        multiple: false,
+        btnText: 'Convert to PDF',
+        outName: 'converted_document.pdf'
+    },
+
     'merge-pdfs': {
         title: 'Merge PDFs',
         desc: 'Combine multiple PDF files into one single document. Upload 2 to 20 PDF files.',

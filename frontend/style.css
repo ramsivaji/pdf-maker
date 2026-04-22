@@ -120,6 +120,14 @@ body {
     background: rgba(79, 200, 164, 0.15);
 }
 
+.text-orange {
+    color: #f7a44f;
+}
+
+.bg-orange-subtle {
+    background: rgba(247, 164, 79, 0.15);
+}
+
 .cta-link {
     font-size: 0.85rem;
     font-weight: 600;
