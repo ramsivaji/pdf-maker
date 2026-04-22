@@ -4,10 +4,12 @@ import shutil
 from pathlib import Path
 from fastapi import UploadFile, HTTPException
 
-# Base directory for all temporary file storage
-TEMP_STORAGE_DIR = Path(__file__).parent.parent.parent / "temp_storage"
-TEMP_STORAGE_DIR.mkdir(exist_ok=True)
+import tempfile
 
+# Use system's temp directory (/tmp on Vercel/Linux, AppData/Local/Temp on Windows)
+# since Vercel's root filesystem is read-only.
+TEMP_STORAGE_DIR = Path(tempfile.gettempdir()) / "pdf_maker_temp"
+TEMP_STORAGE_DIR.mkdir(exist_ok=True)
 # Max file size: 50 MB
 MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024
 
