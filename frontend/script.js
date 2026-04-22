@@ -284,15 +284,20 @@ async function startConversion() {
 }
 
 // ============================================================
-//  PDF ARRANGER  –  drag-drop page reorder
+//  PDF ARRANGER  –  client-side PDF.js thumbnails + drag-drop
 // ============================================================
 let arrangeFile      = null;   // the uploaded File object
-let arrangeThumbs    = [];     // base64 thumbnail list (original order)
+let arrangeThumbs    = [];     // data URL thumbnails (JPEG, rendered by PDF.js)
 let arrangeOrder     = [];     // current page indices (0-indexed)
+let dragSrcIndex     = null;
 
-// Drag-drop state
-let dragSrcIndex = null;
+// Configure PDF.js worker from CDN (same version as the lib)
+if (window.pdfjsLib) {
+    pdfjsLib.GlobalWorkerOptions.workerSrc =
+        'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+}
 
+// Drag & drop on the upload zone
 const arrangeDz = document.getElementById('arrange-dropzone');
 ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(evt => {
     arrangeDz.addEventListener(evt, e => { e.preventDefault(); e.stopPropagation(); });
@@ -305,37 +310,45 @@ const arrangeDz = document.getElementById('arrange-dropzone');
 });
 arrangeDz.addEventListener('drop', e => {
     const files = Array.from(e.dataTransfer.files).filter(f => f.type === 'application/pdf');
-    if (files.length > 0) uploadPdfForArrange(files[0]);
+    if (files.length > 0) renderPdfThumbnails(files[0]);
 });
 
-async function loadPdfForArrange(input) {
+function loadPdfForArrange(input) {
     if (!input.files || input.files.length === 0) return;
-    uploadPdfForArrange(input.files[0]);
+    renderPdfThumbnails(input.files[0]);
 }
 
-async function uploadPdfForArrange(file) {
+async function renderPdfThumbnails(file) {
     arrangeFile = file;
     document.getElementById('arrange-loading').classList.remove('d-none');
     document.getElementById('arrange-error').classList.add('d-none');
     arrangeDz.style.pointerEvents = 'none';
 
-    const formData = new FormData();
-    formData.append('file', file);
-
     try {
-        const res = await fetch(`${API_BASE_URL}/api/arrange/preview`, {
-            method: 'POST',
-            body: formData,
-        });
-        if (!res.ok) {
-            const err = await res.json().catch(() => ({}));
-            throw new Error(err.detail || `Server error ${res.status}`);
-        }
-        const data = await res.json();
-        arrangeThumbs = data.thumbnails;
-        arrangeOrder  = arrangeThumbs.map((_, i) => i);   // [0, 1, 2, ...]
+        if (!window.pdfjsLib) throw new Error('PDF.js library failed to load. Please refresh the page.');
 
-        document.getElementById('arrange-page-count').textContent = data.page_count;
+        const arrayBuffer = await file.arrayBuffer();
+        const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+
+        arrangeThumbs = [];
+        arrangeOrder  = [];
+
+        // Render each page to a canvas and capture as JPEG data URL
+        for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+            const page     = await pdf.getPage(pageNum);
+            const viewport = page.getViewport({ scale: 0.5 });
+
+            const canvas    = document.createElement('canvas');
+            canvas.width    = viewport.width;
+            canvas.height   = viewport.height;
+            const ctx = canvas.getContext('2d');
+
+            await page.render({ canvasContext: ctx, viewport }).promise;
+            arrangeThumbs.push(canvas.toDataURL('image/jpeg', 0.75));
+            arrangeOrder.push(pageNum - 1);   // 0-indexed
+        }
+
+        document.getElementById('arrange-page-count').textContent = pdf.numPages;
         renderPageGrid();
 
         document.getElementById('arrange-upload-step').classList.add('d-none');
@@ -356,16 +369,16 @@ function renderPageGrid() {
     grid.innerHTML = '';
 
     arrangeOrder.forEach((pageIndex, position) => {
-        const thumb = arrangeThumbs[pageIndex];
+        const thumb = arrangeThumbs[pageIndex]; // full data URL from PDF.js
 
         const card = document.createElement('div');
-        card.className    = 'page-thumb';
-        card.draggable    = true;
-        card.dataset.pos  = position;
+        card.className   = 'page-thumb';
+        card.draggable   = true;
+        card.dataset.pos = position;
 
         card.innerHTML = `
             <div class="page-thumb-inner">
-                <img src="data:image/png;base64,${thumb}" alt="Page ${pageIndex + 1}" draggable="false">
+                <img src="${thumb}" alt="Page ${pageIndex + 1}" draggable="false">
                 <span class="page-label">Page ${pageIndex + 1}</span>
                 <button class="page-delete-btn" title="Remove this page" onclick="removeArrangePage(${position})">
                     <i data-lucide="x" style="width:12px;height:12px;"></i>
@@ -373,7 +386,7 @@ function renderPageGrid() {
             </div>
         `;
 
-        // Drag events
+        // Drag events for reordering
         card.addEventListener('dragstart', e => {
             dragSrcIndex = position;
             card.classList.add('dragging');
@@ -392,7 +405,6 @@ function renderPageGrid() {
         card.addEventListener('drop', e => {
             e.preventDefault();
             if (dragSrcIndex === null || dragSrcIndex === position) return;
-            // Reorder
             const moved = arrangeOrder.splice(dragSrcIndex, 1)[0];
             arrangeOrder.splice(position, 0, moved);
             dragSrcIndex = null;
@@ -428,6 +440,7 @@ function resetArrange() {
     document.getElementById('arrange-error-2').classList.add('d-none');
     document.getElementById('arrange-progress').classList.add('d-none');
     lucide.createIcons();
+
 }
 
 async function applyArrangement() {

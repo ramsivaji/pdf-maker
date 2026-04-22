@@ -4,29 +4,9 @@ from fastapi import APIRouter, UploadFile, File, Form, BackgroundTasks, HTTPExce
 from fastapi.responses import FileResponse
 
 from app.utils.file_manager import save_upload_file, delete_files, get_output_path, validate_file
-from app.services.converters import get_pdf_page_thumbnails, arrange_pdf_pages
+from app.services.converters import arrange_pdf_pages
 
 router = APIRouter(prefix="/api/arrange", tags=["PDF Arrangement"])
-
-
-@router.post("/preview", summary="Get page thumbnails for a PDF")
-async def preview_pdf_pages(
-    file: UploadFile = File(..., description="A PDF file to preview"),
-):
-    """
-    Accepts a PDF, renders each page at low resolution, and returns
-    a list of base64-encoded PNG thumbnails for the drag-and-drop UI.
-    """
-    validate_file(file, "pdf")
-    input_path = await save_upload_file(file, ".pdf")
-    try:
-        thumbnails = get_pdf_page_thumbnails(input_path)
-    except RuntimeError as e:
-        raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        delete_files(input_path)
-
-    return {"page_count": len(thumbnails), "thumbnails": thumbnails}
 
 
 @router.post("/apply", summary="Reorder pages in a PDF")
@@ -38,6 +18,7 @@ async def apply_pdf_arrangement(
     """
     Accepts a PDF and a JSON page order array (e.g. [2, 0, 1]) and returns
     a new PDF with pages in the specified order.
+    Page thumbnails are generated client-side via PDF.js — no server thumbnail endpoint needed.
     """
     validate_file(file, "pdf")
 

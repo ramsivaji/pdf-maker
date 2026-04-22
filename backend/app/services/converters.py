@@ -78,39 +78,16 @@ def word_to_pdf(word_path: Path, output_path: Path) -> None:
 
 def merge_pdfs(pdf_paths: list[Path], output_path: Path) -> None:
     """
-    Merges a list of PDF files into a single PDF.
-    Standardizes all pages to A4 size (595x842) by shrinking/centering them.
+    Merges a list of PDF files into a single PDF using PyPDF2 (pure Python, no native deps).
     """
     try:
-        import fitz  # PyMuPDF
-        
-        # A4 paper size in points: 595.0 x 842.0
-        a4_width, a4_height = 595.0, 842.0
-        merged_doc = fitz.open()
-
+        from PyPDF2 import PdfMerger
+        merger = PdfMerger()
         for path in pdf_paths:
-            src_doc = fitz.open(str(path))
-            for page in src_doc:
-                # Create a new blank A4 page
-                new_page = merged_doc.new_page(width=a4_width, height=a4_height)
-                # Draw the original page onto the new A4 page (preserves aspect ratio)
-                new_page.show_pdf_page(new_page.rect, src_doc, page.number, keep_proportion=True)
-            src_doc.close()
-
-        merged_doc.save(str(output_path))
-        merged_doc.close()
-
-    except ImportError:
-        # Fallback to PyPDF2 if fitz is somehow unavailable
-        try:
-            from PyPDF2 import PdfMerger
-            merger = PdfMerger()
-            for path in pdf_paths:
-                merger.append(str(path))
-            merger.write(str(output_path))
-            merger.close()
-        except Exception as e:
-            raise RuntimeError(f"PDF merging failed in fallback: {e}")
+            merger.append(str(path))
+        with open(str(output_path), "wb") as f:
+            merger.write(f)
+        merger.close()
     except Exception as e:
         raise RuntimeError(f"PDF merging failed: {e}")
 
@@ -245,50 +222,27 @@ def resize_image(
         raise RuntimeError(f"Image resize failed: {e}")
 
 
-
-def get_pdf_page_thumbnails(pdf_path: Path) -> list:
-    """
-    Renders each PDF page at 40% scale and returns a list of base64-encoded PNG strings.
-    Used to generate drag-and-drop page previews for the PDF arranger.
-    """
-    try:
-        import fitz
-        import base64
-
-        doc = fitz.open(str(pdf_path))
-        thumbnails = []
-        mat = fitz.Matrix(0.4, 0.4)  # 40% scale — fast and small enough for previews
-        for page in doc:
-            pix = page.get_pixmap(matrix=mat)
-            png_bytes = pix.tobytes("png")
-            thumbnails.append(base64.b64encode(png_bytes).decode("utf-8"))
-        doc.close()
-        return thumbnails
-    except Exception as e:
-        raise RuntimeError(f"PDF thumbnail generation failed: {e}")
-
-
 def arrange_pdf_pages(pdf_path: Path, output_path: Path, page_order: list) -> None:
     """
     Creates a new PDF with pages reordered according to page_order (0-indexed list).
-    Supports duplicating or removing pages as well.
+    Uses PyPDF2 — pure Python, no native library dependencies.
     """
     try:
-        import fitz
+        from PyPDF2 import PdfReader, PdfWriter
 
-        src_doc = fitz.open(str(pdf_path))
-        total = src_doc.page_count
-        # Validate indices
+        reader = PdfReader(str(pdf_path))
+        total  = len(reader.pages)
+
         for idx in page_order:
             if not (0 <= idx < total):
                 raise RuntimeError(f"Page index {idx} is out of range (PDF has {total} pages).")
 
-        new_doc = fitz.open()
+        writer = PdfWriter()
         for idx in page_order:
-            new_doc.insert_pdf(src_doc, from_page=idx, to_page=idx)
-        new_doc.save(str(output_path))
-        new_doc.close()
-        src_doc.close()
+            writer.add_page(reader.pages[idx])
+
+        with open(str(output_path), "wb") as f:
+            writer.write(f)
     except RuntimeError:
         raise
     except Exception as e:
