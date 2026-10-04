@@ -109,6 +109,20 @@ async def convert_merge_pdfs(
     )
 
 
+def _get_image_ext(file: UploadFile) -> str:
+    type_to_ext = {
+        "image/jpeg": ".jpg",
+        "image/png": ".png",
+        "image/webp": ".webp",
+        "image/bmp": ".bmp",
+        "image/tiff": ".tiff",
+    }
+    if file.content_type in type_to_ext:
+        return type_to_ext[file.content_type]
+    ext = os.path.splitext(file.filename or "")[1].lower()
+    return ext if ext in (".jpg", ".jpeg", ".png", ".webp", ".bmp", ".tiff") else ".jpg"
+
+
 @router.post("/image-to-pdf", summary="Convert images (JPG/PNG) to PDF")
 async def convert_image_to_pdf(
     background_tasks: BackgroundTasks,
@@ -120,18 +134,9 @@ async def convert_image_to_pdf(
     for f in files:
         validate_file(f, "image")
 
-    # Detect original extension from content type
-    type_to_ext = {
-        "image/jpeg": ".jpg",
-        "image/png": ".png",
-        "image/webp": ".webp",
-        "image/bmp": ".bmp",
-        "image/tiff": ".tiff",
-    }
-
     input_paths = []
     for f in files:
-        ext = type_to_ext.get(f.content_type, ".jpg")
+        ext = _get_image_ext(f)
         path = await save_upload_file(f, ext)
         input_paths.append(path)
 
@@ -160,14 +165,7 @@ async def compress_image_endpoint(
 ):
     validate_file(file, "image")
 
-    type_to_ext = {
-        "image/jpeg": ".jpg",
-        "image/png": ".png",
-        "image/webp": ".webp",
-        "image/bmp": ".bmp",
-        "image/tiff": ".tiff",
-    }
-    ext = type_to_ext.get(file.content_type, ".jpg")
+    ext = _get_image_ext(file)
     input_path = await save_upload_file(file, ext)
     output_path = get_output_path(ext)
 
@@ -207,14 +205,7 @@ async def resize_image_endpoint(
 
     validate_file(file, "image")
 
-    type_to_ext = {
-        "image/jpeg": ".jpg",
-        "image/png": ".png",
-        "image/webp": ".webp",
-        "image/bmp": ".bmp",
-        "image/tiff": ".tiff",
-    }
-    ext = type_to_ext.get(file.content_type, ".jpg")
+    ext = _get_image_ext(file)
     input_path  = await save_upload_file(file, ext)
     output_path = get_output_path(ext)
 

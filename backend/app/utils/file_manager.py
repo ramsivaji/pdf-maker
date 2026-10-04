@@ -26,7 +26,14 @@ ALLOWED_TYPES = {
 def validate_file(file: UploadFile, expected_type: str) -> None:
     """Validates the file content type and size."""
     allowed = ALLOWED_TYPES.get(expected_type, [])
-    if file.content_type not in allowed:
+    filename = (file.filename or "").lower()
+    ext_allowed = {
+        "pdf": [".pdf"],
+        "word": [".docx", ".doc"],
+        "image": [".jpg", ".jpeg", ".png", ".webp", ".bmp", ".tiff"],
+    }
+    has_valid_ext = any(filename.endswith(ext) for ext in ext_allowed.get(expected_type, []))
+    if file.content_type not in allowed and not has_valid_ext:
         raise HTTPException(
             status_code=400,
             detail=f"Invalid file type '{file.content_type}'. Expected one of: {allowed}",

@@ -22,58 +22,181 @@ def pdf_to_word(pdf_path: Path, output_path: Path) -> None:
         raise RuntimeError(f"PDF to Word conversion failed: {e}")
 
 
+def _word_to_pdf_pure_python(word_path: Path, output_path: Path) -> None:
+    """
+    Converts a .docx Word document to PDF using pure Python (mammoth + xhtml2pdf).
+    Requires zero external binary dependencies (no LibreOffice, no MS Word).
+    Works seamlessly on Vercel, AWS Lambda, Docker, Linux, macOS, and Windows.
+    """
+    import mammoth
+    from xhtml2pdf import pisa
+
+    with open(word_path, "rb") as docx_file:
+        result = mammoth.convert_to_html(docx_file)
+        html_body = result.value
+
+    styled_html = f"""<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+    @page {{
+        size: a4 portrait;
+        margin: 20mm;
+    }}
+    body {{
+        font-family: Helvetica, Arial, sans-serif;
+        font-size: 11pt;
+        line-height: 1.6;
+        color: #1f2937;
+    }}
+    h1 {{ font-size: 22pt; margin-top: 0; margin-bottom: 12px; color: #111827; font-weight: bold; }}
+    h2 {{ font-size: 17pt; margin-top: 18px; margin-bottom: 8px; color: #1f2937; font-weight: bold; }}
+    h3 {{ font-size: 13pt; margin-top: 14px; margin-bottom: 6px; color: #374151; font-weight: bold; }}
+    p {{ margin-top: 0; margin-bottom: 10px; }}
+    table {{
+        width: 100%;
+        margin: 14px 0;
+    }}
+    th, td {{
+        border: 1px solid #d1d5db;
+        padding: 8px 12px;
+        text-align: left;
+        vertical-align: top;
+    }}
+    th {{
+        background-color: #f3f4f6;
+        font-weight: bold;
+        color: #111827;
+    }}
+    img {{
+        max-width: 100%;
+        height: auto;
+    }}
+    ul, ol {{
+        margin-top: 0;
+        margin-bottom: 10px;
+        padding-left: 24px;
+    }}
+    li {{
+        margin-bottom: 4px;
+    }}
+    blockquote {{
+        border-left: 4px solid #3b82f6;
+        padding-left: 12px;
+        margin: 12px 0;
+        color: #4b5563;
+        font-style: italic;
+    }}
+    pre, code {{
+        font-family: monospace;
+        background-color: #f3f4f6;
+        padding: 2px 4px;
+        font-size: 10pt;
+    }}
+</style>
+</head>
+<body>
+{html_body}
+</body>
+</html>"""
+
+    with open(output_path, "wb") as pdf_file:
+        pisa_status = pisa.CreatePDF(styled_html, dest=pdf_file)
+        if pisa_status.err:
+            raise RuntimeError(f"xhtml2pdf rendering error: {pisa_status.err}")
+
+    if not output_path.exists() or output_path.stat().st_size == 0:
+        raise RuntimeError("Output PDF was not generated or is empty.")
+
+
 def word_to_pdf(word_path: Path, output_path: Path) -> None:
     """
-    Converts a .docx Word document to PDF using LibreOffice in headless mode.
-    LibreOffice must be installed. Falls back to a clear error message if not available.
+    Converts a .docx Word document to PDF.
+    Conversion hierarchy:
+    1. LibreOffice (if installed on server/desktop)
+    2. Microsoft Word via docx2pdf (if running locally on Windows/macOS)
+    3. Pure Python engine via mammoth + xhtml2pdf (works everywhere including Vercel)
     """
-    # Common LibreOffice install paths on Windows
-    possible_paths = [
+    errors = []
+
+    # 1. Check for LibreOffice install paths
+    possible_libreoffice_paths = [
         r"C:\Program Files\LibreOffice\program\soffice.exe",
         r"C:\Program Files (x86)\LibreOffice\program\soffice.exe",
-        "soffice",  # If it's in the system PATH (Linux/Docker)
+        "soffice",  # If it's in the system PATH (Linux/Docker/Windows)
         "libreoffice",  # Alternative command (Linux/Docker)
     ]
 
     soffice_cmd = None
-    for path in possible_paths:
+    for path in possible_libreoffice_paths:
         if shutil.which(path) or Path(path).exists():
             soffice_cmd = path
             break
 
-    if not soffice_cmd:
-        raise RuntimeError(
-            "LibreOffice is not installed or not found. "
-            "Please install LibreOffice from https://www.libreoffice.org/download/download/ "
-            "to enable Word-to-PDF conversion."
-        )
+    if soffice_cmd:
+        try:
+            result = subprocess.run(
+                [
+                    soffice_cmd,
+                    "--headless",
+                    "--convert-to", "pdf",
+                    "--outdir", str(output_path.parent),
+                    str(word_path),
+                ],
+                capture_output=True,
+                text=True,
+                timeout=120,
+            )
+            if result.returncode == 0:
+                generated_pdf = output_path.parent / (word_path.stem + ".pdf")
+                if generated_pdf.exists():
+                    if generated_pdf != output_path:
+                        if output_path.exists():
+                            output_path.unlink()
+                        generated_pdf.rename(output_path)
+                    return
+            else:
+                errors.append(f"LibreOffice error: {result.stderr.strip() or result.stdout.strip()}")
+        except Exception as e:
+            errors.append(f"LibreOffice failed: {e}")
 
+    # 2. Try docx2pdf (uses native Microsoft Word on Windows / macOS)
     try:
-        result = subprocess.run(
-            [
-                soffice_cmd,
-                "--headless",
-                "--convert-to", "pdf",
-                "--outdir", str(output_path.parent),
-                str(word_path),
-            ],
-            capture_output=True,
-            text=True,
-            timeout=120,  # 2-minute timeout
-        )
-        if result.returncode != 0:
-            raise RuntimeError(f"LibreOffice exited with error: {result.stderr}")
+        import sys
+        if sys.platform == "win32":
+            try:
+                import pythoncom
+                pythoncom.CoInitialize()
+            except Exception:
+                pass
 
-        # LibreOffice saves the PDF with the same stem as the input file
-        # We need to rename it to match our expected output_path
-        generated_pdf = output_path.parent / (word_path.stem + ".pdf")
-        if generated_pdf.exists() and generated_pdf != output_path:
-            generated_pdf.rename(output_path)
-
-    except subprocess.TimeoutExpired:
-        raise RuntimeError("Word to PDF conversion timed out after 2 minutes.")
+        from docx2pdf import convert
+        convert(str(word_path), str(output_path))
+        if output_path.exists() and output_path.stat().st_size > 0:
+            return
+        else:
+            errors.append("docx2pdf produced empty or missing file.")
     except Exception as e:
-        raise RuntimeError(f"Word to PDF conversion failed: {e}")
+        errors.append(f"docx2pdf / MS Word failed: {e}")
+    finally:
+        if sys.platform == "win32":
+            try:
+                import pythoncom
+                pythoncom.CoUninitialize()
+            except Exception:
+                pass
+
+    # 3. Pure Python fallback (mammoth + xhtml2pdf) — works 100% on Vercel Serverless
+    try:
+        _word_to_pdf_pure_python(word_path, output_path)
+        if output_path.exists() and output_path.stat().st_size > 0:
+            return
+    except Exception as e:
+        errors.append(f"Pure Python conversion failed: {e}")
+
+    error_summary = "; ".join(errors) if errors else "No converter available."
+    raise RuntimeError(f"Word to PDF conversion failed: {error_summary}")
 
 
 def merge_pdfs(pdf_paths: list[Path], output_path: Path) -> None:
