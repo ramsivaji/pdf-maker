@@ -68,8 +68,19 @@ def test_compression_reports_actual_sizes_and_download_path_is_safe():
     assert client.get("/api/download/00000000000000000000000000000000").status_code == 404
 
 
-def test_docx_to_pdf_uses_clear_basic_fallback_without_libreoffice(monkeypatch):
+def test_docx_to_pdf_requires_libreoffice_for_format_preservation(monkeypatch):
     monkeypatch.setattr("app.api.route_studio._find_libreoffice", lambda: None)
+    monkeypatch.delenv("ALLOW_BASIC_DOCX_FALLBACK", raising=False)
+    from docx import Document
+    source = io.BytesIO(); word = Document(); word.add_paragraph("fallback conversion"); word.save(source)
+    response = client.post("/api/docx/to-pdf", files={"file": upload("doc.docx", source.getvalue(), "application/vnd.openxmlformats-officedocument.wordprocessingml.document")})
+    assert response.status_code == 503
+    assert "Format-preserving" in response.json()["detail"]
+
+
+def test_basic_docx_fallback_is_explicitly_opt_in(monkeypatch):
+    monkeypatch.setattr("app.api.route_studio._find_libreoffice", lambda: None)
+    monkeypatch.setenv("ALLOW_BASIC_DOCX_FALLBACK", "true")
     from docx import Document
     source = io.BytesIO(); word = Document(); word.add_paragraph("fallback conversion"); word.save(source)
     response = client.post("/api/docx/to-pdf", files={"file": upload("doc.docx", source.getvalue(), "application/vnd.openxmlformats-officedocument.wordprocessingml.document")})

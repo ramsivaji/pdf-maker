@@ -356,6 +356,8 @@ async def docx_to_pdf(file: UploadFile = File(...)):
         engine = "LibreOffice"
         notice = None
     else:
+        if os.getenv("ALLOW_BASIC_DOCX_FALLBACK", "false").strip().lower() != "true":
+            raise HTTPException(503, "Format-preserving DOCX-to-PDF conversion requires LibreOffice. Vercel does not provide it; deploy the API with the included Dockerfile or connect a LibreOffice-enabled backend. The altered-layout fallback is disabled by default.")
         try:
             output = await asyncio.to_thread(_basic_docx_to_pdf, data)
         except Exception:

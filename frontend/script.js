@@ -130,7 +130,9 @@ function studioOperationChanged() {
     if (op === 'split') options.innerHTML = '<label class="form-label" for="studio-pages">Page ranges (for example 1-3,5)</label><input id="studio-pages" class="form-control bg-dark text-light border-secondary" placeholder="1-3,5">';
     if (op === 'compress') options.innerHTML = '<label class="form-label" for="studio-level">Optimization level</label><select id="studio-level" class="form-select bg-dark text-light border-secondary"><option value="1">1 — light</option><option value="2" selected>2 — balanced</option><option value="3">3 — maximum</option></select>';
     if (op === 'to-images') options.innerHTML = '<label class="form-label" for="studio-pages">Pages (all or ranges)</label><input id="studio-pages" class="form-control bg-dark text-light border-secondary mb-2" value="all"><label class="form-label" for="studio-dpi">Resolution (DPI)</label><input id="studio-dpi" type="number" min="72" max="300" value="150" class="form-control bg-dark text-light border-secondary">';
-    document.getElementById('studio-file-help').textContent = multi ? 'Choose up to 20 PNG or JPEG images.' : 'Select one PDF file. Upload and page limits are enforced by the server.';
+    document.getElementById('studio-file-help').textContent = multi ? 'Choose up to 20 PNG or JPEG images.' :
+        (op === 'docx-to-pdf' ? 'Select one DOCX file. Layout-preserving conversion requires LibreOffice; Vercel does not include it, so use the Docker deployment. The altered-layout fallback is disabled by default.' :
+            'Select one PDF file. Upload and page limits are enforced by the server.');
 }
 
 async function runStudioTool() {
