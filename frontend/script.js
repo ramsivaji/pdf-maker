@@ -113,6 +113,12 @@ function showSection(sectionId) {
     }
 }
 
+function showStudio(operation) {
+    const selector = document.getElementById('studio-operation');
+    if (selector && operation) selector.value = operation;
+    showSection('studio-tools');
+}
+
 function studioOperationChanged() {
     const op = document.getElementById('studio-operation').value;
     const files = document.getElementById('studio-files');
