@@ -159,6 +159,7 @@ async function runStudioTool() {
         const body = await new Promise((resolve, reject) => {
             const request = new XMLHttpRequest();
             request.open('POST', path);
+            request.responseType = 'blob';
             request.upload.onprogress = event => {
                 if (!event.lengthComputable) return;
                 const percent = Math.round(event.loaded * 100 / event.total);
@@ -167,15 +168,34 @@ async function runStudioTool() {
             };
             request.upload.onload = () => { progressLabel.textContent = 'Processing document…'; progressBar.classList.remove('progress-bar-animated'); };
             request.onload = () => {
-                let data = {};
-                try { data = JSON.parse(request.responseText); } catch (_) {}
-                if (request.status >= 200 && request.status < 300) resolve(data);
-                else reject(new Error(data.detail || `Request failed (${request.status})`));
+                const contentType = request.getResponseHeader('Content-Type') || '';
+                if (contentType.includes('application/json')) {
+                    request.response.text().then(text => {
+                        let data = {};
+                        try { data = JSON.parse(text); } catch (_) {}
+                        if (request.status >= 200 && request.status < 300) resolve(data);
+                        else reject(new Error(data.detail || `Request failed (${request.status})`));
+                    });
+                } else if (request.status >= 200 && request.status < 300) {
+                    const disposition = request.getResponseHeader('Content-Disposition') || '';
+                    const match = disposition.match(/filename="?([^";]+)"?/i);
+                    resolve({ direct_blob: request.response, filename: match ? match[1] : 'processed-file',
+                        conversion_engine: request.getResponseHeader('X-Conversion-Engine'),
+                        conversion_notice: request.getResponseHeader('X-Conversion-Notice'),
+                        job_id: request.getResponseHeader('X-Job-ID') });
+                } else reject(new Error(`Request failed (${request.status})`));
             };
             request.onerror = () => reject(new Error('Network error while sending the file.'));
             request.send(form);
         });
-        if (op === 'metadata') {
+        if (body.direct_blob) {
+            const url = URL.createObjectURL(body.direct_blob);
+            const link = document.createElement('a'); link.href = url; link.download = body.filename;
+            document.body.appendChild(link); link.click(); link.remove(); URL.revokeObjectURL(url);
+            const engine = body.conversion_engine ? `Converted with ${escapeHtml(body.conversion_engine)}. ` : '';
+            const notice = body.conversion_notice ? `<div class="small mt-2">${escapeHtml(body.conversion_notice)}</div>` : '';
+            result.innerHTML = `<div class="alert alert-success">${engine}Download started: ${escapeHtml(body.filename)}.${notice}<div class="small">Job ${escapeHtml(body.job_id || '')}</div></div>`;
+        } else if (op === 'metadata') {
             result.innerHTML = `<div class="alert alert-success">Pages: ${body.page_count} · Size: ${(body.file_size/1024).toFixed(1)} KB · Title: ${escapeHtml(body.title || '—')} · Author: ${escapeHtml(body.author || '—')} · Created: ${escapeHtml(body.creation_date || '—')}</div>`;
         } else {
             const reduction = body.input_size ? ((body.input_size-body.output_size)*100/body.input_size).toFixed(1) : '0.0';

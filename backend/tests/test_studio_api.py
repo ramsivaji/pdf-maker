@@ -68,11 +68,15 @@ def test_compression_reports_actual_sizes_and_download_path_is_safe():
     assert client.get("/api/download/00000000000000000000000000000000").status_code == 404
 
 
-def test_docx_to_pdf_fails_clearly_without_libreoffice(monkeypatch):
+def test_docx_to_pdf_uses_clear_basic_fallback_without_libreoffice(monkeypatch):
     monkeypatch.setattr("app.api.route_studio._find_libreoffice", lambda: None)
-    response = client.post("/api/docx/to-pdf", files={"file": upload("doc.docx", b"PK\x03\x04dummy", "application/vnd.openxmlformats-officedocument.wordprocessingml.document")})
-    assert response.status_code == 503
-    assert "LibreOffice" in response.json()["detail"]
+    from docx import Document
+    source = io.BytesIO(); word = Document(); word.add_paragraph("fallback conversion"); word.save(source)
+    response = client.post("/api/docx/to-pdf", files={"file": upload("doc.docx", source.getvalue(), "application/vnd.openxmlformats-officedocument.wordprocessingml.document")})
+    assert response.status_code == 200
+    assert response.json()["conversion_engine"] == "ReportLab basic renderer"
+    assert "Complex layout" in response.json()["conversion_notice"]
+    assert client.get(response.json()["download_url"]).content.startswith(b"%PDF-")
 
 
 def test_to_docx_creates_docx():
@@ -114,3 +118,17 @@ def test_upload_limit_mime_and_expired_download(monkeypatch, tmp_path):
     monkeypatch.setattr(studio, "RETENTION", -1)
     studio._cleanup()
     assert not old_file.exists()
+
+
+def test_vercel_outputs_are_returned_directly(monkeypatch, tmp_path):
+    import app.api.route_studio as studio
+    monkeypatch.setattr(studio, "ON_VERCEL", True)
+    monkeypatch.setattr(studio, "STORE", tmp_path)
+    monkeypatch.setattr(studio, "DB", tmp_path / "history.sqlite3")
+    response = studio._result("docx-to-pdf", 100, b"%PDF-result", ".pdf", "converted.pdf",
+                              {"conversion_engine": "ReportLab basic renderer", "conversion_notice": "Basic conversion."})
+    assert response.media_type == "application/pdf"
+    assert response.body.startswith(b"%PDF")
+    assert response.headers["X-Conversion-Engine"] == "ReportLab basic renderer"
+    assert response.headers["X-Conversion-Notice"] == "Basic conversion."
+    assert not list(tmp_path.glob("*.pdf"))

@@ -9,7 +9,7 @@ PDF Maker is a local-first document processing web app built with FastAPI. It of
 - Expires stored files after `FILE_RETENTION_HOURS` (default 24); cleanup runs when processing a new job.
 - Limits PDF uploads to 50 MiB and 300 pages by default; page image conversion is capped at 50 pages and 300 DPI.
 - PDF to DOCX preserves extracted text order and paragraph breaks as best effort; complex layout, tables, columns, and scanned PDFs will not convert perfectly. OCR is not included.
-- DOCX to PDF requires LibreOffice. The service returns a clear 503 if it is unavailable.
+- DOCX to PDF uses LibreOffice when available. On serverless hosts without it, a bundled ReportLab fallback converts text and tables and clearly warns that complex formatting and images are not preserved.
 - Swagger docs are available at `/docs`.
 
 ## Architecture
@@ -56,7 +56,7 @@ If PowerShell blocks venv activation, use `\.venv\Scripts\python.exe -m pip inst
 | POST | `/api/pdf/split` | Extract ranges such as `1-3,5` (1-based) |
 | POST | `/api/pdf/compress` | Optimize PDF (level 1–3), report actual byte sizes |
 | POST | `/api/pdf/to-docx` | Extract PDF text into DOCX |
-| POST | `/api/docx/to-pdf` | Convert using LibreOffice |
+| POST | `/api/docx/to-pdf` | Convert using LibreOffice or the clearly labeled basic ReportLab fallback |
 | POST | `/api/pdf/extract-text` | Download page-numbered text as TXT |
 | POST | `/api/pdf/to-images` | Render up to 50 pages into a PNG ZIP |
 | POST | `/api/images/to-pdf` | Convert 1–20 PNG/JPEG files |
@@ -66,7 +66,7 @@ If PowerShell blocks venv activation, use `\.venv\Scripts\python.exe -m pip inst
 | GET | `/api/jobs/{job_id}` | One job record |
 | GET | `/api/download/{file_id}` | Download a generated output |
 
-Processing endpoints return JSON containing a `download_url`, `job_id`, and actual size information. Example using PowerShell:
+On local and Docker deployments, processing endpoints return JSON containing a `download_url`, `job_id`, and actual size information. On Vercel, they return the generated file directly because function instances do not share a durable local filesystem. DOCX conversion responses identify the selected engine and report the basic renderer's limitations. Example using PowerShell:
 
 ```powershell
 curl.exe -F "file=@sample.pdf" -F "pages=1-2" http://127.0.0.1:8000/api/pdf/split
@@ -83,7 +83,7 @@ Tests create small PDFs in memory and do not access private files or external se
 
 ## Docker deployment
 
-Copy `.env.example` to `.env`, then run `docker compose up --build`. Compose persists the database and temporary files in the `pdf-studio-data` volume. The image includes LibreOffice Writer and a health check. For a hosted deployment, use a Python/container host that supports writable persistent storage, sufficient memory and request duration, and LibreOffice if DOCX conversion is required. Static-only hosting cannot run this API. You may deploy the frontend and backend separately by configuring the frontend API base URL and CORS. Provider free tiers vary and may impose strict storage, memory, and runtime limits.
+Copy `.env.example` to `.env`, then run `docker compose up --build`. Compose persists the database and temporary files in the `pdf-studio-data` volume. The image includes LibreOffice Writer and a health check. Vercel runs functions on a read-only filesystem except for ephemeral `/tmp`, so this app switches its temporary storage there and returns generated files directly from the processing request. Vercel currently limits function request and response bodies to 4.5 MB; PDF Maker caps uploads and generated output below that limit. Vercel's `/tmp` and SQLite history are ephemeral and are not durable across instances. Use the Docker deployment or another Python host with persistent storage for larger files and durable history. Static-only hosting cannot run this API. Provider free tiers vary and may impose strict storage, memory, and runtime limits.
 
 ## Security, limitations, and future improvements
 

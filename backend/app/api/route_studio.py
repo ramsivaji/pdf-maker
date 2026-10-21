@@ -1,6 +1,8 @@
 """Validated PDF Maker API endpoints and lightweight processing history."""
 import asyncio
 import io
+import html
+import mimetypes
 import json
 import os
 import re
@@ -16,17 +18,22 @@ from pathlib import Path
 
 import pymupdf
 from fastapi import APIRouter, File, Form, HTTPException, Query, UploadFile
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, Response
 from PIL import Image, UnidentifiedImageError
 from pypdf import PdfReader, PdfWriter
 from docx import Document
 
 router = APIRouter(prefix="/api", tags=["PDF Maker"])
 ROOT = Path(__file__).resolve().parents[2]
-STORE = Path(os.getenv("PDF_STORAGE_DIR", str(ROOT / "temp_storage"))).resolve()
+ON_VERCEL = bool(os.getenv("VERCEL"))
+DEFAULT_STORE = Path(tempfile.gettempdir()) / "pdf_maker_temp" if ON_VERCEL else ROOT / "temp_storage"
+STORE = Path(os.getenv("PDF_STORAGE_DIR", str(DEFAULT_STORE))).resolve()
 STORE.mkdir(parents=True, exist_ok=True)
 DB = Path(os.getenv("PDF_DATABASE_PATH", str(STORE / "history.sqlite3")))
 MAX_BYTES = int(os.getenv("MAX_UPLOAD_SIZE", str(50 * 1024 * 1024)))
+if ON_VERCEL:
+    # Vercel Functions cap request bodies at 4.5 MB; leave room for multipart framing.
+    MAX_BYTES = min(MAX_BYTES, 4 * 1024 * 1024)
 RETENTION = int(os.getenv("FILE_RETENTION_HOURS", "24")) * 3600
 MAX_PAGES = int(os.getenv("MAX_PDF_PAGES", "300"))
 MAX_RENDER_DPI = int(os.getenv("MAX_RENDER_DPI", "300"))
@@ -106,19 +113,32 @@ def _pdf(data: bytes) -> PdfReader:
         raise HTTPException(400, "Unable to parse the uploaded PDF.")
 
 
-def _result(operation: str, input_size: int, output: bytes, ext: str, filename: str):
+def _result(operation: str, input_size: int, output: bytes, ext: str, filename: str, details=None):
     _cleanup()
-    file_id, job_id = uuid.uuid4().hex, uuid.uuid4().hex
-    path = STORE / f"{file_id}{ext}"
-    path.write_bytes(output)
+    if ON_VERCEL and len(output) > 4 * 1024 * 1024:
+        raise HTTPException(413, "The generated file exceeds Vercel's 4 MB safe response limit. Use the Docker deployment for larger documents.")
+    file_id, job_id = (None if ON_VERCEL else uuid.uuid4().hex), uuid.uuid4().hex
+    path = STORE / f"{file_id}{ext}" if file_id else None
+    if path:
+        path.write_bytes(output)
     _db()
     with sqlite3.connect(DB) as conn:
         conn.execute("INSERT INTO jobs VALUES (?, ?, ?, ?, ?, ?, ?)", (job_id, operation,
           datetime.now(timezone.utc).isoformat(), "completed", input_size, len(output), file_id))
-    return JSONResponse({"job_id": job_id, "file_id": file_id, "filename": filename,
+    response = {"job_id": job_id, "file_id": file_id, "filename": filename,
                          "input_size": input_size, "output_size": len(output),
                          "reduction_percent": round((input_size - len(output)) * 100 / input_size, 2) if input_size else 0,
-                         "download_url": f"/api/download/{file_id}"})
+                         "download_url": f"/api/download/{file_id}"}
+    if details: response.update(details)
+    if ON_VERCEL:
+        headers = {"Content-Disposition": f'attachment; filename="{filename}"', "X-Job-ID": job_id}
+        if details:
+            engine = details.get("conversion_engine")
+            notice = details.get("conversion_notice")
+            if engine: headers["X-Conversion-Engine"] = engine
+            if notice: headers["X-Conversion-Notice"] = notice
+        return Response(content=output, media_type=mimetypes.guess_type(filename)[0] or "application/octet-stream", headers=headers)
+    return JSONResponse(response)
 
 
 def _serialize(writer: PdfWriter) -> bytes:
@@ -187,6 +207,64 @@ def _images_pdf(contents):
             rgb = im.convert("RGB"); buf = io.BytesIO(); rgb.save(buf, "PDF", resolution=150)
         writer.add_page(PdfReader(buf).pages[0])
     return _serialize(writer)
+
+
+def _basic_docx_to_pdf(data: bytes) -> bytes:
+    """Portable fallback for serverless hosts without LibreOffice; text and tables only."""
+    from docx import Document as WordDocument
+    from docx.oxml.text.paragraph import CT_P
+    from docx.oxml.table import CT_Tbl
+    from docx.text.paragraph import Paragraph
+    from docx.table import Table as WordTable
+    from reportlab.lib import colors
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.enums import TA_LEFT
+    from reportlab.platypus import SimpleDocTemplate, Paragraph as PdfParagraph, Spacer, Table, TableStyle
+
+    word = WordDocument(io.BytesIO(data))
+    styles = getSampleStyleSheet()
+    normal = styles["BodyText"]
+    normal.fontName = "Helvetica"
+    normal.fontSize = 10
+    normal.leading = 14
+    heading = ParagraphStyle("DocHeading", parent=styles["Heading2"], fontName="Helvetica-Bold", alignment=TA_LEFT)
+    story = []
+    for block in word.element.body.iterchildren():
+        if isinstance(block, CT_P):
+            paragraph = Paragraph(block, word)
+            pieces = []
+            for run in paragraph.runs:
+                value = html.escape(run.text).replace("\n", "<br/>")
+                if run.bold: value = f"<b>{value}</b>"
+                if run.italic: value = f"<i>{value}</i>"
+                if run.underline: value = f"<u>{value}</u>"
+                pieces.append(value)
+            text = "".join(pieces).strip()
+            if not text:
+                continue
+            is_heading = paragraph.style and paragraph.style.name.lower().startswith("heading")
+            story.append(PdfParagraph(text, heading if is_heading else normal))
+            story.append(Spacer(1, 5))
+        elif isinstance(block, CT_Tbl):
+            table = WordTable(block, word)
+            rows = [[PdfParagraph(html.escape(cell.text).replace("\n", "<br/>"), normal) for cell in row.cells]
+                    for row in table.rows]
+            if rows:
+                pdf_table = Table(rows, repeatRows=1, hAlign="LEFT")
+                pdf_table.setStyle(TableStyle([
+                    ("GRID", (0, 0), (-1, -1), 0.4, colors.HexColor("#9ca3af")),
+                    ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#eef2f7")),
+                    ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                    ("LEFTPADDING", (0, 0), (-1, -1), 6),
+                    ("RIGHTPADDING", (0, 0), (-1, -1), 6),
+                ]))
+                story.extend((pdf_table, Spacer(1, 8)))
+    out = io.BytesIO()
+    SimpleDocTemplate(out, pagesize=A4, rightMargin=48, leftMargin=48, topMargin=48, bottomMargin=48,
+                      title=word.core_properties.title or "Converted document",
+                      author=word.core_properties.author or "").build(story)
+    return out.getvalue()
 
 
 def _find_libreoffice():
@@ -263,20 +341,29 @@ async def to_docx(file: UploadFile = File(...)):
 async def docx_to_pdf(file: UploadFile = File(...)):
     data = await _read(file, "docx")
     office = _find_libreoffice()
-    if not office:
-        raise HTTPException(503, "DOCX-to-PDF requires LibreOffice. Install it and set LIBREOFFICE_PATH if it is not on PATH.")
-    with tempfile.TemporaryDirectory(dir=STORE) as tmp:
-        src = Path(tmp) / "input.docx"; src.write_bytes(data)
+    if office:
+        with tempfile.TemporaryDirectory(dir=STORE) as tmp:
+            src = Path(tmp) / "input.docx"; src.write_bytes(data)
+            try:
+                proc = await asyncio.to_thread(subprocess.run, [office, "--headless", "--convert-to", "pdf", "--outdir", tmp, str(src)],
+                    capture_output=True, timeout=90, check=False)
+            except (OSError, subprocess.TimeoutExpired):
+                raise HTTPException(503, "LibreOffice conversion failed or timed out.")
+            outpath = Path(tmp) / "input.pdf"
+            if proc.returncode or not outpath.is_file():
+                raise HTTPException(422, "LibreOffice could not convert this DOCX file.")
+            output = outpath.read_bytes()
+        engine = "LibreOffice"
+        notice = None
+    else:
         try:
-            proc = await asyncio.to_thread(subprocess.run, [office, "--headless", "--convert-to", "pdf", "--outdir", tmp, str(src)],
-                capture_output=True, timeout=90, check=False)
-        except (OSError, subprocess.TimeoutExpired):
-            raise HTTPException(503, "LibreOffice conversion failed or timed out.")
-        outpath = Path(tmp) / "input.pdf"
-        if proc.returncode or not outpath.is_file():
-            raise HTTPException(422, "LibreOffice could not convert this DOCX file.")
-        output = outpath.read_bytes()
-    return _result("docx-to-pdf", len(data), output, ".pdf", "converted.pdf")
+            output = await asyncio.to_thread(_basic_docx_to_pdf, data)
+        except Exception:
+            raise HTTPException(422, "The DOCX could not be converted by the basic renderer. Try LibreOffice for broader format support.")
+        engine = "ReportLab basic renderer"
+        notice = "Basic conversion: text and tables only. Complex layout, images, columns, and exact formatting may differ."
+    return _result("docx-to-pdf", len(data), output, ".pdf", "converted.pdf",
+                   {"conversion_engine": engine, "conversion_notice": notice} if notice else {"conversion_engine": engine})
 
 
 @router.post("/pdf/extract-text")
@@ -359,6 +446,8 @@ async def job(job_id: str):
 
 @router.get("/download/{file_id}")
 async def download(file_id: str):
+    if ON_VERCEL:
+        raise HTTPException(404, "Vercel downloads are returned directly by the processing request; the temporary filesystem is not shared between requests.")
     if not re.fullmatch(r"[a-f0-9]{32}", file_id): raise HTTPException(404, "Download not found or expired.")
     matches = list(STORE.glob(f"{file_id}.*"))
     if not matches or matches[0].resolve().parent != STORE: raise HTTPException(404, "Download not found or expired.")
