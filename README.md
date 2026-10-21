@@ -1,6 +1,6 @@
-# PDF Studio — Advanced PDF Processing API
+# PDF Maker — Advanced PDF Processing API
 
-PDF Studio is a local-first document processing web app built with FastAPI. It offers PDF merge, split, optimization, text extraction, metadata inspection, PDF/DOCX conversion, page rendering, and image-to-PDF tools. The existing interface also includes page arranging, image compression, and image resizing.
+PDF Maker is a local-first document processing web app built with FastAPI. It offers PDF merge, split, optimization, text extraction, metadata inspection, PDF/DOCX conversion, page rendering, and image-to-PDF tools. The existing interface also includes page arranging, image compression, and image resizing.
 
 ## Features
 

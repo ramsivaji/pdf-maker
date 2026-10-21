@@ -1,4 +1,4 @@
-"""Validated PDF Studio API endpoints and lightweight processing history."""
+"""Validated PDF Maker API endpoints and lightweight processing history."""
 import asyncio
 import io
 import json
@@ -21,7 +21,7 @@ from PIL import Image, UnidentifiedImageError
 from pypdf import PdfReader, PdfWriter
 from docx import Document
 
-router = APIRouter(prefix="/api", tags=["PDF Studio"])
+router = APIRouter(prefix="/api", tags=["PDF Maker"])
 ROOT = Path(__file__).resolve().parents[2]
 STORE = Path(os.getenv("PDF_STORAGE_DIR", str(ROOT / "temp_storage"))).resolve()
 STORE.mkdir(parents=True, exist_ok=True)
@@ -202,7 +202,7 @@ def _find_libreoffice():
 
 @router.get("/health")
 async def health():
-    return {"status": "ok", "service": "PDF Studio"}
+    return {"status": "ok", "service": "PDF Maker"}
 
 
 @router.get("/tools")

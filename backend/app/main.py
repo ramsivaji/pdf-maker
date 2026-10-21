@@ -8,7 +8,7 @@ from app.api.route_arrange import router as arrange_router
 from app.api.route_studio import router as studio_router
 
 app = FastAPI(
-    title="PDF Studio — Advanced PDF Processing API",
+    title="PDF Maker — Advanced PDF Processing API",
     description=(
         "A powerful API for converting files between formats. "
         "Supports PDF to Word, Word to PDF, merging PDFs, and converting Images to PDF."
