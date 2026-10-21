@@ -1,5 +1,22 @@
 // Initialize Lucide icons
 lucide.createIcons();
+const savedTheme = localStorage.getItem('pdf-studio-theme');
+if (savedTheme === 'light') applyTheme('light');
+
+function applyTheme(theme) {
+    document.body.dataset.theme = theme;
+    const button = document.getElementById('theme-toggle');
+    if (button) {
+        button.textContent = theme === 'light' ? 'Dark theme' : 'Light theme';
+        button.setAttribute('aria-pressed', String(theme === 'light'));
+    }
+}
+
+function toggleTheme() {
+    const next = document.body.dataset.theme === 'light' ? 'dark' : 'light';
+    localStorage.setItem('pdf-studio-theme', next);
+    applyTheme(next);
+}
 
 // Since frontend is now served by FastAPI directly, API calls are relative
 const API_BASE_URL = "";
@@ -75,6 +92,7 @@ function showSection(sectionId) {
     document.getElementById('sec-tool').className    = 'section-hidden max-w-800 mx-auto';
     document.getElementById('sec-arrange').className = 'section-hidden max-w-1000 mx-auto';
     document.getElementById('sec-resize').className  = 'section-hidden max-w-700 mx-auto';
+    document.getElementById('sec-studio').className = 'section-hidden max-w-800 mx-auto';
 
     if (sectionId === 'home') {
         document.getElementById('sec-home').className = 'section-active';
@@ -85,10 +103,93 @@ function showSection(sectionId) {
     } else if (sectionId === 'resize-image') {
         document.getElementById('sec-resize').className = 'section-active max-w-700 mx-auto';
         lucide.createIcons();
+    } else if (sectionId === 'studio-tools') {
+        document.getElementById('sec-studio').className = 'section-active max-w-800 mx-auto';
+        studioOperationChanged();
+        loadStudioJobs();
     } else {
         document.getElementById('sec-tool').className = 'section-active max-w-800 mx-auto';
         loadToolConfig(sectionId);
     }
+}
+
+function studioOperationChanged() {
+    const op = document.getElementById('studio-operation').value;
+    const files = document.getElementById('studio-files');
+    const multi = op === 'images';
+    files.accept = multi ? '.png,.jpg,.jpeg' : (op === 'docx-to-pdf' ? '.docx' : '.pdf');
+    files.multiple = multi;
+    const options = document.getElementById('studio-options');
+    options.innerHTML = '';
+    if (op === 'split') options.innerHTML = '<label class="form-label" for="studio-pages">Page ranges (for example 1-3,5)</label><input id="studio-pages" class="form-control bg-dark text-light border-secondary" placeholder="1-3,5">';
+    if (op === 'compress') options.innerHTML = '<label class="form-label" for="studio-level">Optimization level</label><select id="studio-level" class="form-select bg-dark text-light border-secondary"><option value="1">1 — light</option><option value="2" selected>2 — balanced</option><option value="3">3 — maximum</option></select>';
+    if (op === 'to-images') options.innerHTML = '<label class="form-label" for="studio-pages">Pages (all or ranges)</label><input id="studio-pages" class="form-control bg-dark text-light border-secondary mb-2" value="all"><label class="form-label" for="studio-dpi">Resolution (DPI)</label><input id="studio-dpi" type="number" min="72" max="300" value="150" class="form-control bg-dark text-light border-secondary">';
+    document.getElementById('studio-file-help').textContent = multi ? 'Choose up to 20 PNG or JPEG images.' : 'Select one PDF file. Upload and page limits are enforced by the server.';
+}
+
+async function runStudioTool() {
+    const op = document.getElementById('studio-operation').value;
+    const input = document.getElementById('studio-files');
+    const files = Array.from(input.files || []);
+    const result = document.getElementById('studio-result');
+    if (!files.length) { result.innerHTML = '<div class="alert alert-warning">Select a file first.</div>'; return; }
+    const form = new FormData();
+    files.forEach(file => form.append(op === 'images' ? 'files' : 'file', file));
+    let path = `/api/pdf/${op}`;
+    if (op === 'to-docx') path = '/api/pdf/to-docx';
+    if (op === 'docx-to-pdf') path = '/api/docx/to-pdf';
+    if (op === 'extract') path = '/api/pdf/extract-text';
+    if (op === 'images') path = '/api/images/to-pdf';
+    if (op === 'split') form.append('pages', document.getElementById('studio-pages').value);
+    if (op === 'compress') form.append('level', document.getElementById('studio-level').value);
+    if (op === 'to-images') { form.append('pages', document.getElementById('studio-pages').value); form.append('dpi', document.getElementById('studio-dpi').value); }
+    const button = document.getElementById('studio-submit'); button.disabled = true; button.textContent = 'Processing…';
+    result.innerHTML = '<div class="text-secondary">Uploading and processing your document…</div>';
+    const progress = document.getElementById('studio-progress');
+    const progressBar = document.getElementById('studio-progress-bar');
+    const progressLabel = document.getElementById('studio-progress-label');
+    progress.classList.remove('d-none'); progressBar.style.width = '0%'; progressLabel.textContent = 'Uploading…';
+    try {
+        const body = await new Promise((resolve, reject) => {
+            const request = new XMLHttpRequest();
+            request.open('POST', path);
+            request.upload.onprogress = event => {
+                if (!event.lengthComputable) return;
+                const percent = Math.round(event.loaded * 100 / event.total);
+                progressBar.style.width = `${percent}%`;
+                progressLabel.textContent = `Uploading… ${percent}%`;
+            };
+            request.upload.onload = () => { progressLabel.textContent = 'Processing document…'; progressBar.classList.remove('progress-bar-animated'); };
+            request.onload = () => {
+                let data = {};
+                try { data = JSON.parse(request.responseText); } catch (_) {}
+                if (request.status >= 200 && request.status < 300) resolve(data);
+                else reject(new Error(data.detail || `Request failed (${request.status})`));
+            };
+            request.onerror = () => reject(new Error('Network error while sending the file.'));
+            request.send(form);
+        });
+        if (op === 'metadata') {
+            result.innerHTML = `<div class="alert alert-success">Pages: ${body.page_count} · Size: ${(body.file_size/1024).toFixed(1)} KB · Title: ${escapeHtml(body.title || '—')} · Author: ${escapeHtml(body.author || '—')} · Created: ${escapeHtml(body.creation_date || '—')}</div>`;
+        } else {
+            const reduction = body.input_size ? ((body.input_size-body.output_size)*100/body.input_size).toFixed(1) : '0.0';
+            const detail = op === 'compress' ? ` Size: ${reduction}% ${reduction >= 0 ? 'smaller' : 'larger'}.` : '';
+            result.innerHTML = `<div class="alert alert-success">Processing complete.${detail} <a href="${body.download_url}" class="alert-link" download="${escapeHtml(body.filename)}">Download ${escapeHtml(body.filename)}</a><div class="small">Output ${body.output_size} bytes · Job ${body.job_id}</div></div>`;
+        }
+        await loadStudioJobs();
+    } catch (error) {
+        result.innerHTML = `<div class="alert alert-danger">${escapeHtml(error.message)}</div>`;
+    } finally { button.disabled = false; button.textContent = 'Process'; progress.classList.add('d-none'); progressBar.classList.add('progress-bar-animated'); }
+}
+
+function escapeHtml(value) { const div = document.createElement('div'); div.textContent = value; return div.innerHTML; }
+
+async function loadStudioJobs() {
+    const target = document.getElementById('studio-jobs');
+    try {
+        const response = await fetch('/api/jobs'); const body = await response.json();
+        target.innerHTML = body.jobs.length ? body.jobs.map(job => `<div class="border-bottom border-secondary py-2"><strong>${escapeHtml(job.operation)}</strong> · ${escapeHtml(new Date(job.created_at).toLocaleString())} · ${job.input_size} → ${job.output_size} bytes</div>`).join('') : 'No processing jobs yet.';
+    } catch (_) { target.textContent = 'Job history is temporarily unavailable.'; }
 }
 
 function loadToolConfig(toolId) {

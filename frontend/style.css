@@ -19,6 +19,26 @@ body {
     -webkit-font-smoothing: antialiased;
 }
 
+body[data-theme="light"] {
+    --bg-primary: #f4f6fb;
+    --bg-card: #ffffff;
+    --bg-card-hover: #edf1f8;
+    --border-color: #d8deea;
+    --border-dashed: #9aa8c1;
+    color: #1d2738 !important;
+    background-color: var(--bg-primary) !important;
+}
+
+body[data-theme="light"] .text-light { color: #1d2738 !important; }
+body[data-theme="light"] .text-secondary,
+body[data-theme="light"] .text-muted { color: #596579 !important; }
+body[data-theme="light"] .bg-dark,
+body[data-theme="light"] .dropzone { background-color: #fff !important; }
+body[data-theme="light"] .bg-glass { background: rgba(244, 246, 251, 0.9) !important; }
+body[data-theme="light"] .form-control,
+body[data-theme="light"] .form-select { background-color: #fff !important; color: #1d2738 !important; }
+body[data-theme="light"] .list-group-item-dark { background-color: #fff; color: #1d2738; }
+
 .max-w-1200 { max-width: 1200px; }
 .max-w-1000 { max-width: 1000px; }
 .max-w-800  { max-width: 800px; }
