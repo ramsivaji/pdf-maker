@@ -69,8 +69,7 @@ def test_compression_reports_actual_sizes_and_download_path_is_safe():
 
 
 def test_docx_to_pdf_fails_clearly_without_libreoffice(monkeypatch):
-    monkeypatch.setattr("app.api.route_studio.shutil.which", lambda _: None)
-    monkeypatch.delenv("LIBREOFFICE_PATH", raising=False)
+    monkeypatch.setattr("app.api.route_studio._find_libreoffice", lambda: None)
     response = client.post("/api/docx/to-pdf", files={"file": upload("doc.docx", b"PK\x03\x04dummy", "application/vnd.openxmlformats-officedocument.wordprocessingml.document")})
     assert response.status_code == 503
     assert "LibreOffice" in response.json()["detail"]

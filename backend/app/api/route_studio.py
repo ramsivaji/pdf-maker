@@ -189,6 +189,17 @@ def _images_pdf(contents):
     return _serialize(writer)
 
 
+def _find_libreoffice():
+    candidates = [os.getenv("LIBREOFFICE_PATH"), shutil.which("soffice"), shutil.which("libreoffice")]
+    if os.name == "nt":
+        candidates.extend((r"C:\Program Files\LibreOffice\program\soffice.exe",
+                           r"C:\Program Files (x86)\LibreOffice\program\soffice.exe"))
+    for candidate in candidates:
+        if candidate and (Path(candidate).is_file() or shutil.which(candidate)):
+            return str(candidate)
+    return None
+
+
 @router.get("/health")
 async def health():
     return {"status": "ok", "service": "PDF Studio"}
@@ -251,8 +262,7 @@ async def to_docx(file: UploadFile = File(...)):
 @router.post("/docx/to-pdf")
 async def docx_to_pdf(file: UploadFile = File(...)):
     data = await _read(file, "docx")
-    configured = os.getenv("LIBREOFFICE_PATH")
-    office = configured or shutil.which("soffice") or shutil.which("libreoffice")
+    office = _find_libreoffice()
     if not office:
         raise HTTPException(503, "DOCX-to-PDF requires LibreOffice. Install it and set LIBREOFFICE_PATH if it is not on PATH.")
     with tempfile.TemporaryDirectory(dir=STORE) as tmp:
